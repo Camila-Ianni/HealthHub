@@ -1,0 +1,116 @@
+classDiagram
+    class Usuario {
+      -String id
+      -String nombre
+      -String apellido
+      -String telefono
+      +mostrarMenu()
+    }
+
+    class Recepcionista {
+      +registrarPaciente()
+      +buscarPaciente()
+      +crearTurno()
+      +reprogramarTurno()
+      +cancelarTurno()
+    }
+
+    class Medico {
+      -String matricula
+      -String especialidad
+      +visualizarTurnos()
+      +marcarTurnoAtendido()
+      +visualizarHistorial()
+      +actualizarHistorial()
+      +cancelarJornada()
+    }
+
+    class Administrador {
+      +registrarMedico()
+      +gestionarDisponibilidad()
+      +registrarEmpleado()
+    }
+
+    class Paciente {
+      -String dni
+      -String obraSocial
+    }
+
+    class Turno {
+      -String id
+      -LocalDateTime fechaHora
+      -EstadoTurno estado
+      -boolean sobreturno
+      +cancelar()
+      +reprogramar()
+      +marcarAtendido()
+    }
+
+    class HistorialClinico {
+      -String id
+      -List~EntradaHistorial~ entradas
+      +agregarEntrada()
+      +listarEntradas()
+    }
+
+    class EntradaHistorial {
+      -LocalDateTime fecha
+      -String resumenConsulta
+      -String diagnostico
+      -String estudios
+    }
+
+    class Disponibilidad {
+      -DayOfWeek dia
+      -LocalTime horaInicio
+      -LocalTime horaFin
+      +solapaCon(Disponibilidad)
+    }
+
+    class PacienteService {
+      +registrar(Paciente)
+      +buscarPorDni(String)
+      +buscarPorNombre(String)
+      +modificar(Paciente)
+    }
+
+    class MedicoService {
+      +registrar(Medico)
+      +actualizarDisponibilidad()
+      +cancelarJornada()
+    }
+
+    class TurnoService {
+      +crearTurno()
+      +cancelarTurno()
+      +reprogramarTurno()
+      +validarDuplicado()
+    }
+
+    class HistorialService {
+      +crearHistorial(Paciente)
+      +registrarConsulta()
+      +actualizarDiagnostico()
+      +registrarEstudio()
+    }
+
+    class NotificationService {
+      +notificarCambioTurno()
+    }
+
+    Usuario <|-- Recepcionista
+    Usuario <|-- Medico
+    Usuario <|-- Administrador
+    Usuario <|-- Paciente
+
+    Paciente "1" --> "1" HistorialClinico : posee
+    HistorialClinico "1" --> "*" EntradaHistorial : contiene
+    Medico "1" --> "*" Disponibilidad : define
+    Medico "1" --> "*" Turno : atiende
+    Paciente "1" --> "*" Turno : solicita
+
+    Recepcionista ..> PacienteService
+    Recepcionista ..> TurnoService
+    Administrador ..> MedicoService
+    Medico ..> HistorialService
+    TurnoService ..> NotificationService
