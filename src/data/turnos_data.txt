@@ -1,2 +1,0 @@
-A001|P001|D001|2026-04-01|10:00 AM|COMPLETED|Annual checkup|Patient is healthy. Blood pressure normal.|Continue regular exercise. Follow-up in 6 months.
-A002|P002|D002|2026-04-02|02:30 PM|CANCELLED|Child vaccination||

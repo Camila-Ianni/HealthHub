@@ -1,2 +1,0 @@
-U003|drjohnson|doc123|johnson@healthhub.com|D001|Robert|Johnson|Cardiology|LIC-12345|+1-555-9999|15|Cardiology|false
-U004|drwilliams|doc456|williams@healthhub.com|D002|Sarah|Williams|Pediatrics|LIC-67890|+1-555-8888|10|Pediatrics|true

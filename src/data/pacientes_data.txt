@@ -1,2 +1,0 @@
-U001|jdoe|pass123|john.doe@email.com|P001|John|Doe|1990-05-15|Male|+1-555-0000|123 Main St, City|No major illnesses
-U002|msmith|pass456|mary.smith@email.com|P002|Mary|Smith|1985-08-22|Female|+1-555-5678|456 Oak Ave, City|Allergic to penicillin
