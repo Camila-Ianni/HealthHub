@@ -1,0 +1,52 @@
+erDiagram
+    USUARIO {
+        string id PK
+        string nombre
+        string apellido
+        string telefono
+        string rol
+    }
+
+    PACIENTE {
+        string dni PK
+        string obraSocial
+    }
+
+    MEDICO {
+        string matricula PK
+        string especialidad
+    }
+
+    DISPONIBILIDAD {
+        string id PK
+        string diaSemana
+        string horaInicio
+        string horaFin
+    }
+
+    TURNO {
+        string id PK
+        datetime fechaHora
+        string estado
+        boolean sobreturno
+    }
+
+    HISTORIAL_CLINICO {
+        string id PK
+        string pacienteDni FK
+        datetime fechaCreacion
+    }
+
+    ENTRADA_HISTORIAL {
+        string id PK
+        datetime fecha
+        string resumenConsulta
+        string diagnostico
+        string estudios
+    }
+
+    PACIENTE ||--|| HISTORIAL_CLINICO : posee
+    HISTORIAL_CLINICO ||--o{ ENTRADA_HISTORIAL : contiene
+    MEDICO ||--o{ DISPONIBILIDAD : define
+    PACIENTE ||--o{ TURNO : solicita
+    MEDICO ||--o{ TURNO : atiende
