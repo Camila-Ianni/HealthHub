@@ -185,4 +185,15 @@ public class GestorMedicos {
     public List<Medico> listarTodos() {
         return new ArrayList<>(medicosPorMatricula.values());
     }
+
+    /**
+     * Devuelve una copia de todas las disponibilidades por médico.
+     */
+    public Map<String, List<Disponibilidad>> obtenerDisponibilidadesPorMedico() {
+        Map<String, List<Disponibilidad>> copia = new HashMap<>();
+        for (Map.Entry<String, List<Disponibilidad>> entry : disponibilidadesPorMedico.entrySet()) {
+            copia.put(entry.getKey(), new ArrayList<>(entry.getValue()));
+        }
+        return copia;
+    }
 }

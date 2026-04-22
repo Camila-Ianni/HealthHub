@@ -51,7 +51,8 @@ public class App {
     private static Persistencia persistencia;
     
     // Ruta donde guardamos los archivos de datos
-    private static final Path RUTA_DATOS = Path.of("datos");
+    private static final Path RUTA_DATOS = Path.of("data");
+    private static final String CARPETA_BACKUP = "data";
 
     public static void main(String[] args) {
         // Inicializamos todo el sistema
@@ -78,7 +79,7 @@ public class App {
                     break;
                 case "0":
                     continuar = false;
-                    guardarDatosEnArchivos();
+                    guardarBackup(CARPETA_BACKUP);
                     System.out.println("Saliendo del sistema...");
                     break;
                 default:
@@ -99,13 +100,6 @@ public class App {
         // Creamos la carpeta de datos si no existe
         RUTA_DATOS.toFile().mkdirs();
         
-        // Inicializamos la persistencia
-        persistencia = new Persistencia(RUTA_DATOS);
-        
-        // Cargamos los datos desde los archivos
-        System.out.println("[INFO] Cargando datos desde archivos...");
-        cargarDatosDeArchivos();
-        
         // Inicializamos los servicios
         gestorHistoriales = new GestorHistoriales();
         gestorPacientes = new GestorPacientes(gestorHistoriales);
@@ -113,6 +107,10 @@ public class App {
         gestorNotifs = new GestorNotificaciones();
         gestorTurnos = new GestorTurnos(gestorMedicos, gestorNotifs);
         gestorEmpleados = new GestorEmpleados();
+
+        // Inicializamos la persistencia y restauramos estado
+        persistencia = new Persistencia(RUTA_DATOS);
+        cargarBackup(CARPETA_BACKUP);
         
         System.out.println("[INFO] Sistema inicializado correctamente.");
         informarHorarioLaboral();
@@ -140,6 +138,18 @@ public class App {
         for (Paciente paciente : pacientesCargados) {
             gestorPacientes.registrarPaciente(paciente);
         }
+
+        // Cargamos historiales
+        List<HistorialClinico> historialesCargados = persistencia.cargarHistoriales();
+        gestorHistoriales.cargarHistoriales(historialesCargados);
+        
+        // Cargamos turnos
+        List<Turno> turnosCargados = persistencia.cargarTurnos();
+        gestorTurnos.cargarTurnos(turnosCargados);
+        
+        // Cargamos notificaciones
+        Map<String, List<String>> notificacionesCargadas = persistencia.cargarNotificaciones();
+        gestorNotifs.cargarNotificaciones(notificacionesCargadas);
         
         // Cargamos empleados
         List<com.healthhub.domain.Empleado> empleadosCargados = persistencia.cargarEmpleados();
@@ -147,8 +157,8 @@ public class App {
             gestorEmpleados.registrarEmpleado(empleado.getLegajo(), empleado.getNombre(), empleado.getRol());
         }
         
-        System.out.println("[INFO] Datos cargados: " + pacientesCargados.size() + " pacientes, " 
-            + medicosCargados.size() + " médicos.");
+        System.out.println("[INFO] Datos cargados: " + pacientesCargados.size() + " pacientes, "
+            + medicosCargados.size() + " médicos, " + turnosCargados.size() + " turnos.");
     }
     
     /**
@@ -163,9 +173,21 @@ public class App {
         persistencia.guardarMedicos(gestorMedicos.listarTodos());
         persistencia.guardarEmpleados(gestorEmpleados.listarTodos());
         persistencia.guardarTurnos(gestorTurnos.listarTodos());
-        // TODO: Guardar disponibilidades y notificaciones (necesita métodos extra)
+        persistencia.guardarHistoriales(gestorHistoriales.listarTodos());
+        persistencia.guardarDisponibilidades(gestorMedicos.obtenerDisponibilidadesPorMedico());
+        persistencia.guardarNotificaciones(gestorNotifs.listarTodas());
         
         System.out.println("[INFO] Datos guardados correctamente.");
+    }
+    
+    private static void cargarBackup(String carpeta) {
+        System.out.println("[INFO] Cargando backup desde '" + carpeta + "'...");
+        cargarDatosDeArchivos();
+    }
+    
+    private static void guardarBackup(String carpeta) {
+        System.out.println("[INFO] Guardando backup en '" + carpeta + "'...");
+        guardarDatosEnArchivos();
     }
     
     /**

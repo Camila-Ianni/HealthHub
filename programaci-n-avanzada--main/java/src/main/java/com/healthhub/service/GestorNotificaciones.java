@@ -56,4 +56,15 @@ public class GestorNotificaciones {
             notificacionesPorMedico.put(entry.getKey(), new ArrayList<>(entry.getValue()));
         }
     }
+
+    /**
+     * Devuelve una copia de todas las notificaciones por médico.
+     */
+    public Map<String, List<String>> listarTodas() {
+        Map<String, List<String>> copia = new HashMap<>();
+        for (Map.Entry<String, List<String>> entry : notificacionesPorMedico.entrySet()) {
+            copia.put(entry.getKey(), new ArrayList<>(entry.getValue()));
+        }
+        return copia;
+    }
 }

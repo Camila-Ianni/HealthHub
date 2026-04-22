@@ -21,6 +21,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -29,8 +30,8 @@ import java.util.Map;
 /**
  * Persistencia - se encarga de guardar y cargar los datos en archivos .txt.
  * 
- * IDEA: Guardamos cada entidad en su propio archivo para que sea más fácil de probar.
- * Esto es temporal para esta entrega - después se podría pasar a una base de datos.
+ * Implementación de persistencia en archivos de texto planos.
+ * Cada entidad se guarda en su propio archivo para mantener el formato simple y explícito.
  * 
  * Archivos que usamos:
  * - pacientes_data.txt
@@ -41,7 +42,6 @@ import java.util.Map;
  * - empleados_data.txt
  * - notificaciones_data.txt
  * 
- * TODO: Agregar backup automático cada cierto tiempo
  */
 public class Persistencia {
     
@@ -333,13 +333,17 @@ public class Persistencia {
                 
                 String[] partes = linea.split("\\|");
                 if (partes.length >= 4) {
-                    String matricula = partes[0];
-                    int diaNum = Integer.parseInt(partes[1]);
-                    LocalTime inicio = LocalTime.parse(partes[2], TIME_FORMAT);
-                    LocalTime fin = LocalTime.parse(partes[3], TIME_FORMAT);
-                    
-                    Disponibilidad disp = new Disponibilidad(DayOfWeek.of(diaNum), inicio, fin);
-                    disponibilidades.computeIfAbsent(matricula, k -> new ArrayList<>()).add(disp);
+                    try {
+                        String matricula = partes[0];
+                        int diaNum = Integer.parseInt(partes[1]);
+                        LocalTime inicio = LocalTime.parse(partes[2], TIME_FORMAT);
+                        LocalTime fin = LocalTime.parse(partes[3], TIME_FORMAT);
+                        
+                        Disponibilidad disp = new Disponibilidad(DayOfWeek.of(diaNum), inicio, fin);
+                        disponibilidades.computeIfAbsent(matricula, k -> new ArrayList<>()).add(disp);
+                    } catch (NumberFormatException | DateTimeParseException e) {
+                        System.out.println("Línea inválida en disponibilidades, se omite: " + linea);
+                    }
                 }
             }
         } catch (IOException e) {

@@ -22,6 +22,9 @@ Thumbs.db
 build/
 dist/
 target/
+data/
+programaci-n-avanzada--main/java/data/
+programaci-n-avanzada--main/java/datos/
 
 # Logs
 *.log
