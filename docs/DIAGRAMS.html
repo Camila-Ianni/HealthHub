@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealthHub - Diagramas Interactivos</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        nav {
+            background: #f8f9fa;
+            padding: 15px;
+            border-bottom: 3px solid #667eea;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        nav button {
+            background: white;
+            border: 2px solid #667eea;
+            color: #667eea;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        nav button:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+        nav button.active {
+            background: #667eea;
+            color: white;
+        }
+        .content {
+            padding: 30px;
+        }
+        .diagram-section {
+            display: none;
+            animation: fadeIn 0.5s;
+        }
+        .diagram-section.active {
+            display: block;
+        }
+        .diagram-section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 2em;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .diagram-section p {
+            color: #666;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        .mermaid {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border: 2px solid #e9ecef;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        footer {
+            background: #2d3748;
+            color: white;
+            text-align: center;
+            padding: 20px;
+            margin-top: 30px;
+        }
+        .controls {
+            text-align: right;
+            margin-bottom: 15px;
+        }
+        .controls button {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-left: 10px;
+            font-weight: bold;
+        }
+        .controls button:hover {
+            background: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏥 HealthHub</h1>
+            <p>Sistema de Gestión de Salud - Diagramas Interactivos</p>
+        </header>
+
+        <nav>
+            <button onclick="showDiagram('er')" class="active">📊 DER</button>
+            <button onclick="showDiagram('class')">🏗️ Clases UML</button>
+            <button onclick="showDiagram('usecase')">👤 Casos de Uso</button>
+            <button onclick="showDiagram('sequence')">🔄 Secuencia</button>
+            <button onclick="showDiagram('state')">⚡ Estados</button>
+        </nav>
+
+        <div class="content">
+            <!-- ER Diagram -->
+            <div id="er" class="diagram-section active">
+                <h2>Diagrama Entidad-Relación (DER)</h2>
+                <p>Muestra las entidades principales del sistema y sus relaciones. User es la clase base, Patient y Doctor heredan de User, y Appointment conecta pacientes con doctores.</p>
+                <div class="controls">
+                    <button onclick="downloadSVG('mermaid-er')">💾 Descargar SVG</button>
+                </div>
+                <div class="mermaid" id="mermaid-er">
+erDiagram
+    USER ||--o{ PATIENT : "is-a"
+    USER ||--o{ DOCTOR : "is-a"
+    PATIENT ||--o{ APPOINTMENT : "has"
+    DOCTOR ||--o{ APPOINTMENT : "attends"
+    
+    USER {
+        string id PK
+        string username
+        string password
+        string email
+        string role
+    }
+    
+    PATIENT {
+        string patientId PK
+        string userId FK
+        string firstName
+        string lastName
+        string dateOfBirth
+        string gender
+        string phoneNumber
+        string address
+        string medicalHistory
+    }
+    
+    DOCTOR {
+        string doctorId PK
+        string userId FK
+        string firstName
+        string lastName
+        string specialization
+        string licenseNumber
+        string phoneNumber
+        int yearsOfExperience
+        string department
+        boolean isAvailable
+    }
+    
+    APPOINTMENT {
+        string appointmentId PK
+        string patientId FK
+        string doctorId FK
+        string appointmentDate
+        string appointmentTime
+        string status
+        string reason
+        string diagnosis
+        string prescription
+    }
+                </div>
+            </div>
+
+            <!-- Class Diagram -->
+            <div id="class" class="diagram-section">
+                <h2>Diagrama de Clases UML</h2>
+                <p>Arquitectura orientada a objetos con herencia, encapsulación y composición. User es la clase base abstracta con Patient y Doctor como subclases.</p>
+                <div class="controls">
+                    <button onclick="downloadSVG('mermaid-class')">💾 Descargar SVG</button>
+                </div>
+                <div class="mermaid" id="mermaid-class">
+classDiagram
+    class User {
+        -String id
+        -String username
+        -String password
+        -String email
+        -String role
+        +User()
+        +User(id, username, password, email, role)
+        +getId() String
+        +setId(id) void
+        +getUsername() String
+        +setUsername(username) void
+        +getPassword() String
+        +setPassword(password) void
+        +getEmail() String
+        +setEmail(email) void
+        +getRole() String
+        +setRole(role) void
+        +toString() String
+    }
+    
+    class Patient {
+        -String patientId
+        -String firstName
+        -String lastName
+        -String dateOfBirth
+        -String gender
+        -String phoneNumber
+        -String address
+        -String medicalHistory
+        +Patient()
+        +Patient(params)
+        +getPatientId() String
+        +setPatientId(id) void
+        +getFirstName() String
+        +setFirstName(name) void
+        +getLastName() String
+        +setLastName(name) void
+        +getFullName() String
+        +toString() String
+    }
+    
+    class Doctor {
+        -String doctorId
+        -String firstName
+        -String lastName
+        -String specialization
+        -String licenseNumber
+        -String phoneNumber
+        -int yearsOfExperience
+        -String department
+        -boolean isAvailable
+        +Doctor()
+        +Doctor(params)
+        +getDoctorId() String
+        +setDoctorId(id) void
+        +getSpecialization() String
+        +setSpecialization(spec) void
+        +getFullName() String
+        +toString() String
+    }
+    
+    class Appointment {
+        -String appointmentId
+        -Patient patient
+        -Doctor doctor
+        -String appointmentDate
+        -String appointmentTime
+        -String status
+        -String reason
+        -String diagnosis
+        -String prescription
+        +Appointment()
+        +Appointment(params)
+        +completeAppointment(diagnosis, prescription) void
+        +cancelAppointment() void
+        +toString() String
+    }
+    
+    User <|-- Patient : extends
+    User <|-- Doctor : extends
+    Appointment o-- Patient : has-a
+    Appointment o-- Doctor : has-a
+                </div>
+            </div>
+
+            <!-- Use Case Diagram -->
+            <div id="usecase" class="diagram-section">
+                <h2>Diagrama de Casos de Uso</h2>
+                <p>Funcionalidades principales del sistema desde la perspectiva de cada actor (Paciente, Doctor, Administrador).</p>
+                <div class="controls">
+                    <button onclick="downloadSVG('mermaid-usecase')">💾 Descargar SVG</button>
+                </div>
+                <div class="mermaid" id="mermaid-usecase">
+graph TB
+    subgraph Sistema HealthHub
+        UC1[Registrar Usuario]
+        UC2[Agendar Cita]
+        UC3[Ver Historial Médico]
+        UC4[Completar Cita]
+        UC5[Cancelar Cita]
+        UC6[Actualizar Disponibilidad]
+        UC7[Gestionar Usuarios]
+    end
+    
+    Patient((Paciente))
+    Doctor((Doctor))
+    Admin((Administrador))
+    
+    Patient --> UC1
+    Patient --> UC2
+    Patient --> UC3
+    Patient --> UC5
+    
+    Doctor --> UC1
+    Doctor --> UC4
+    Doctor --> UC6
+    Doctor --> UC3
+    
+    Admin --> UC7
+    Admin --> UC1
+                </div>
+            </div>
+
+            <!-- Sequence Diagram -->
+            <div id="sequence" class="diagram-section">
+                <h2>Diagramas de Secuencia</h2>
+                <p>Flujos de interacción entre objetos para operaciones clave del sistema.</p>
+                
+                <h3 style="color: #667eea; margin-top: 30px;">Agendar Cita</h3>
+                <div class="controls">
+                    <button onclick="downloadSVG('mermaid-seq1')">💾 Descargar SVG</button>
+                </div>
+                <div class="mermaid" id="mermaid-seq1">
+sequenceDiagram
+    participant P as Patient
+    participant A as Appointment
+    participant D as Doctor
+    
+    P->>D: Check availability
+    D-->>P: Return isAvailable
+    P->>A: Create appointment
+    A->>A: Set status = SCHEDULED
+    A->>D: Assign to doctor
+    A-->>P: Confirmation
+                </div>
+
+                <h3 style="color: #667eea; margin-top: 30px;">Completar Cita</h3>
+                <div class="controls">
+                    <button onclick="downloadSVG('mermaid-seq2')">💾 Descargar SVG</button>
+                </div>
+                <div class="mermaid" id="mermaid-seq2">
+sequenceDiagram
+    participant D as Doctor
+    participant A as Appointment
+    participant P as Patient
+    
+    D->>A: completeAppointment(diagnosis, prescription)
+    A->>A: Set diagnosis
+    A->>A: Set prescription
+    A->>A: Set status = COMPLETED
+    A->>P: Update medical history
+    A-->>D: Success confirmation
+                </div>
+            </div>
+
+            <!-- State Diagram -->
+            <div id="state" class="diagram-section">
+                <h2>Diagrama de Estados</h2>
+                <p>Ciclo de vida de una cita médica desde su creación hasta su finalización o cancelación.</p>
+                <div class="controls">
+                    <button onclick="downloadSVG('mermaid-state')">💾 Descargar SVG</button>
+                </div>
+                <div class="mermaid" id="mermaid-state">
+stateDiagram-v2
+    [*] --> SCHEDULED : Create appointment
+    SCHEDULED --> COMPLETED : completeAppointment()
+    SCHEDULED --> CANCELLED : cancelAppointment()
+    COMPLETED --> [*]
+    CANCELLED --> [*]
+    
+    note right of SCHEDULED
+        Initial state when
+        appointment is created
+    end note
+    
+    note right of COMPLETED
+        Final state with
+        diagnosis and prescription
+    end note
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p><strong>HealthHub</strong> - Sistema de Gestión de Salud | Universidad Project 2026</p>
+            <p style="margin-top: 10px; font-size: 0.9em;">Diagramas generados con Mermaid.js | Haz clic en "Descargar SVG" para exportar</p>
+        </footer>
+    </div>
+
+    <script>
+        // Initialize Mermaid
+        mermaid.initialize({ 
+            startOnLoad: true,
+            theme: 'default',
+            securityLevel: 'loose',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true
+            }
+        });
+
+        // Switch between diagrams
+        function showDiagram(diagramId) {
+            // Hide all diagrams
+            document.querySelectorAll('.diagram-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            // Show selected diagram
+            document.getElementById(diagramId).classList.add('active');
+            
+            // Update nav buttons
+            document.querySelectorAll('nav button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+        }
+
+        // Download SVG function
+        function downloadSVG(elementId) {
+            const element = document.getElementById(elementId);
+            const svg = element.querySelector('svg');
+            
+            if (svg) {
+                const serializer = new XMLSerializer();
+                const svgString = serializer.serializeToString(svg);
+                const blob = new Blob([svgString], { type: 'image/svg+xml' });
+                const url = URL.createObjectURL(blob);
+                
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = elementId + '.svg';
+                link.click();
+                
+                URL.revokeObjectURL(url);
+            }
+        }
+    </script>
+</body>
+</html>
