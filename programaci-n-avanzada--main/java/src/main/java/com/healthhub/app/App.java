@@ -1,47 +1,44 @@
 package com.healthhub.app;
 
 import com.healthhub.domain.Disponibilidad;
+import com.healthhub.domain.Empleado;
+import com.healthhub.domain.EntradaHistorial;
+import com.healthhub.domain.EstadoTurno;
 import com.healthhub.domain.HistorialClinico;
+import com.healthhub.domain.Medico;
 import com.healthhub.domain.Paciente;
 import com.healthhub.domain.RolUsuario;
 import com.healthhub.domain.Turno;
-import com.healthhub.service.GestorPacientes;
-import com.healthhub.service.GestorMedicos;
-import com.healthhub.service.GestorTurnos;
-import com.healthhub.service.GestorHistoriales;
 import com.healthhub.service.GestorEmpleados;
+import com.healthhub.service.GestorHistoriales;
+import com.healthhub.service.GestorMedicos;
 import com.healthhub.service.GestorNotificaciones;
+import com.healthhub.service.GestorPacientes;
+import com.healthhub.service.GestorTurnos;
 import com.healthhub.service.Persistencia;
 
+import java.nio.file.Path;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Scanner;
 
 /**
  * App - Clase principal del sistema Health Hub.
- * 
- * Esta es la maqueta del sistema para la primera entrega.
- * Los menús están implementados pero las funciones están vacías (solo muestran mensajes).
- * 
- * NOTA: Usamos Scanner para leer de la consola. Es lo que vimos en clase.
- * 
- * @author Alumnos de Programación Avanzada
- * @version 1.0 - Primera Entrega
+ * Implementa login por legajo, menues por rol y funcionalidades de gestion.
  */
 public class App {
-    
-    // Scanner para leer de la consola - lo usamos en todo el programa
+
     private static Scanner scanner;
-    
-    // Servicios del sistema - los inicializamos en el main
+
     private static GestorPacientes gestorPacientes;
     private static GestorMedicos gestorMedicos;
     private static GestorTurnos gestorTurnos;
@@ -49,58 +46,54 @@ public class App {
     private static GestorEmpleados gestorEmpleados;
     private static GestorNotificaciones gestorNotifs;
     private static Persistencia persistencia;
-    
-    // Ruta donde guardamos los archivos de datos
+
     private static final Path RUTA_DATOS = Path.of("data");
     private static final String CARPETA_BACKUP = "data";
+    private static final LocalTime HORA_INICIO_LABORAL = LocalTime.of(8, 0);
+    private static final LocalTime HORA_FIN_LABORAL = LocalTime.of(20, 0);
+    private static final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private static final DateTimeFormatter FORMATO_HORA = DateTimeFormatter.ofPattern("HH:mm");
+    private static final DateTimeFormatter FORMATO_FECHA_HORA = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     public static void main(String[] args) {
-        // Inicializamos todo el sistema
         inicializarSistema();
-        
+
         boolean continuar = true;
-        
-        // Bucle principal del menú
         while (continuar) {
-            mostrarMenuPrincipal();
-            System.out.print("Seleccione una opcion: ");
-            String opcion = scanner.nextLine();
-            
-            // Usamos switch clásico como vimos en clase
-            switch (opcion) {
-                case "1":
+            Optional<Empleado> empleadoOpt = login();
+            if (empleadoOpt.isEmpty()) {
+                continuar = false;
+                break;
+            }
+
+            Empleado empleado = empleadoOpt.get();
+            System.out.println("\nBienvenido/a " + empleado.getNombre() + " (" + empleado.getRol() + ").");
+
+            switch (empleado.getRol()) {
+                case RECEPCIONISTA:
                     menuRecepcionista();
                     break;
-                case "2":
+                case MEDICO:
                     menuMedico();
                     break;
-                case "3":
+                case ADMINISTRADOR:
                     menuAdministrador();
                     break;
-                case "0":
-                    continuar = false;
-                    guardarBackup(CARPETA_BACKUP);
-                    System.out.println("Saliendo del sistema...");
-                    break;
                 default:
-                    System.out.println("Opcion invalida. Intente de nuevo.");
+                    System.out.println("Rol no reconocido.");
                     break;
             }
         }
-        
+
+        guardarBackup(CARPETA_BACKUP);
+        System.out.println("Saliendo del sistema...");
         scanner.close();
     }
-    
-    /**
-     * Inicializa todos los servicios y carga los datos guardados.
-     */
+
     private static void inicializarSistema() {
         scanner = new Scanner(System.in);
-        
-        // Creamos la carpeta de datos si no existe
         RUTA_DATOS.toFile().mkdirs();
-        
-        // Inicializamos los servicios
+
         gestorHistoriales = new GestorHistoriales();
         gestorPacientes = new GestorPacientes(gestorHistoriales);
         gestorMedicos = new GestorMedicos();
@@ -108,23 +101,47 @@ public class App {
         gestorTurnos = new GestorTurnos(gestorMedicos, gestorNotifs);
         gestorEmpleados = new GestorEmpleados();
 
-        // Inicializamos la persistencia y restauramos estado
         persistencia = new Persistencia(RUTA_DATOS);
         cargarBackup(CARPETA_BACKUP);
-        
+
         System.out.println("[INFO] Sistema inicializado correctamente.");
         informarHorarioLaboral();
     }
-    
-    /**
-     * Carga todos los datos desde los archivos de persistencia.
-     */
+
+    private static Optional<Empleado> login() {
+        while (true) {
+            System.out.println("\n=== HEALTH HUB - LOGIN ===");
+            System.out.print("Ingrese su legajo (o 0 para salir): ");
+            String legajo = scanner.nextLine().trim();
+
+            if ("0".equals(legajo)) {
+                return Optional.empty();
+            }
+
+            if (legajo.isEmpty()) {
+                System.out.println("Error: el legajo no puede estar vacio.");
+                continue;
+            }
+
+            Optional<Empleado> empleadoOpt = gestorEmpleados.buscarPorLegajo(legajo);
+            if (empleadoOpt.isPresent()) {
+                return empleadoOpt;
+            }
+
+            System.out.println("Error: no existe un empleado con legajo '" + legajo + "'.");
+            System.out.print("1. Reintentar | 0. Salir: ");
+            String opcion = scanner.nextLine().trim();
+            if ("0".equals(opcion)) {
+                return Optional.empty();
+            }
+        }
+    }
+
     private static void cargarDatosDeArchivos() {
-        // Cargamos médicos primero (los turnos los necesitan)
-        List<com.healthhub.domain.Medico> medicosCargados = persistencia.cargarMedicos();
+        List<Medico> medicosCargados = persistencia.cargarMedicos();
         Map<String, List<Disponibilidad>> disponibilidadesCargadas = persistencia.cargarDisponibilidades();
-        
-        for (com.healthhub.domain.Medico medico : medicosCargados) {
+
+        for (Medico medico : medicosCargados) {
             gestorMedicos.registrarMedico(medico);
         }
         for (Map.Entry<String, List<Disponibilidad>> entry : disponibilidadesCargadas.entrySet()) {
@@ -132,43 +149,31 @@ public class App {
                 gestorMedicos.agregarDisponibilidad(entry.getKey(), disp);
             }
         }
-        
-        // Cargamos pacientes
+
         List<Paciente> pacientesCargados = persistencia.cargarPacientes();
         for (Paciente paciente : pacientesCargados) {
             gestorPacientes.registrarPaciente(paciente);
         }
 
-        // Cargamos historiales
         List<HistorialClinico> historialesCargados = persistencia.cargarHistoriales();
         gestorHistoriales.cargarHistoriales(historialesCargados);
-        
-        // Cargamos turnos
+
         List<Turno> turnosCargados = persistencia.cargarTurnos();
         gestorTurnos.cargarTurnos(turnosCargados);
-        
-        // Cargamos notificaciones
+
         Map<String, List<String>> notificacionesCargadas = persistencia.cargarNotificaciones();
         gestorNotifs.cargarNotificaciones(notificacionesCargadas);
-        
-        // Cargamos empleados
-        List<com.healthhub.domain.Empleado> empleadosCargados = persistencia.cargarEmpleados();
-        for (com.healthhub.domain.Empleado empleado : empleadosCargados) {
+
+        List<Empleado> empleadosCargados = persistencia.cargarEmpleados();
+        for (Empleado empleado : empleadosCargados) {
             gestorEmpleados.registrarEmpleado(empleado.getLegajo(), empleado.getNombre(), empleado.getRol());
         }
-        
+
         System.out.println("[INFO] Datos cargados: " + pacientesCargados.size() + " pacientes, "
-            + medicosCargados.size() + " médicos, " + turnosCargados.size() + " turnos.");
+            + medicosCargados.size() + " medicos, " + turnosCargados.size() + " turnos.");
     }
-    
-    /**
-     * Guarda todos los datos en los archivos correspondientes.
-     * Lo llamamos antes de cerrar el sistema.
-     */
+
     private static void guardarDatosEnArchivos() {
-        System.out.println("[INFO] Guardando datos en archivos...");
-        
-        // Guardamos cada entidad en su archivo
         persistencia.guardarPacientes(gestorPacientes.listarTodos());
         persistencia.guardarMedicos(gestorMedicos.listarTodos());
         persistencia.guardarEmpleados(gestorEmpleados.listarTodos());
@@ -176,35 +181,22 @@ public class App {
         persistencia.guardarHistoriales(gestorHistoriales.listarTodos());
         persistencia.guardarDisponibilidades(gestorMedicos.obtenerDisponibilidadesPorMedico());
         persistencia.guardarNotificaciones(gestorNotifs.listarTodas());
-        
-        System.out.println("[INFO] Datos guardados correctamente.");
     }
-    
+
     private static void cargarBackup(String carpeta) {
         System.out.println("[INFO] Cargando backup desde '" + carpeta + "'...");
         cargarDatosDeArchivos();
     }
-    
+
     private static void guardarBackup(String carpeta) {
         System.out.println("[INFO] Guardando backup en '" + carpeta + "'...");
         guardarDatosEnArchivos();
-    }
-    
-    /**
-     * Muestra el menú principal con las opciones por rol.
-     */
-    private static void mostrarMenuPrincipal() {
-        System.out.println("\n=== HEALTH HUB - Sistema de Gestion Clinica ===");
-        System.out.println("1. Acceso Recepcionista");
-        System.out.println("2. Acceso Medico");
-        System.out.println("3. Acceso Administrador");
-        System.out.println("0. Salir");
     }
 
     // =========================================================================
     // MENU RECEPCIONISTA
     // =========================================================================
-    
+
     private static void menuRecepcionista() {
         boolean volver = false;
         while (!volver) {
@@ -218,11 +210,10 @@ public class App {
             System.out.println("7. Reprogramar turno");
             System.out.println("8. Consultar disponibilidad de medico");
             System.out.println("9. Registrar sobreturno");
-            System.out.println("0. Volver");
+            System.out.println("0. Cerrar sesion");
             System.out.print("Opcion: ");
 
-            String opcion = scanner.nextLine();
-            
+            String opcion = scanner.nextLine().trim();
             switch (opcion) {
                 case "1":
                     registrarPaciente();
@@ -249,7 +240,7 @@ public class App {
                     consultarDisponibilidad();
                     break;
                 case "9":
-                    crearTurno(true);  // sobreturno
+                    crearTurno(true);
                     break;
                 case "0":
                     volver = true;
@@ -264,7 +255,7 @@ public class App {
     // =========================================================================
     // MENU MEDICO
     // =========================================================================
-    
+
     private static void menuMedico() {
         boolean volver = false;
         while (!volver) {
@@ -277,11 +268,10 @@ public class App {
             System.out.println("6. Marcar turno como atendido");
             System.out.println("7. Cancelar jornada");
             System.out.println("8. Ver notificaciones");
-            System.out.println("0. Volver");
+            System.out.println("0. Cerrar sesion");
             System.out.print("Opcion: ");
 
-            String opcion = scanner.nextLine();
-            
+            String opcion = scanner.nextLine().trim();
             switch (opcion) {
                 case "1":
                     consultarTurnosMedico();
@@ -320,7 +310,7 @@ public class App {
     // =========================================================================
     // MENU ADMINISTRADOR
     // =========================================================================
-    
+
     private static void menuAdministrador() {
         boolean volver = false;
         while (!volver) {
@@ -329,11 +319,12 @@ public class App {
             System.out.println("2. Agregar disponibilidad de medico");
             System.out.println("3. Reemplazar disponibilidades de medico");
             System.out.println("4. Registrar empleado");
-            System.out.println("0. Volver");
+            System.out.println("5. Ver agenda consolidada");
+            System.out.println("6. Ver estadisticas del dia");
+            System.out.println("0. Cerrar sesion");
             System.out.print("Opcion: ");
 
-            String opcion = scanner.nextLine();
-            
+            String opcion = scanner.nextLine().trim();
             switch (opcion) {
                 case "1":
                     registrarMedico();
@@ -347,6 +338,12 @@ public class App {
                 case "4":
                     registrarEmpleado();
                     break;
+                case "5":
+                    verAgendaConsolidada();
+                    break;
+                case "6":
+                    verEstadisticasDelDia();
+                    break;
                 case "0":
                     volver = true;
                     break;
@@ -356,273 +353,593 @@ public class App {
             }
         }
     }
-    
+
     // =========================================================================
-    // FUNCIONES DEL MENU RECEPCIONISTA (MAQUETAS)
+    // FUNCIONES DEL MENU RECEPCIONISTA
     // =========================================================================
 
     private static void registrarPaciente() {
         System.out.println("\n--- Registrar Paciente ---");
-        System.out.print("DNI (sin puntos ni espacios): ");
-        String dni = scanner.nextLine().trim();
-        
-        // Validamos que el DNI no esté vacío antes de seguir
-        if (dni.isEmpty()) {
-            System.out.println("Error: El DNI no puede estar vacío.");
+        String dni = solicitarNumeroNoVacio("DNI (sin puntos ni espacios): ", "DNI");
+
+        if (gestorPacientes.buscarPorDni(dni).isPresent()) {
+            System.out.println("Error: ya existe un paciente con ese DNI.");
             return;
         }
-        
-        System.out.print("Nombre: ");
-        String nombre = scanner.nextLine().trim();
-        System.out.print("Apellido: ");
-        String apellido = scanner.nextLine().trim();
-        System.out.print("Telefono: ");
-        String telefono = scanner.nextLine().trim();
-        System.out.print("Obra social: ");
-        String obraSocial = scanner.nextLine().trim();
-        
-        // TODO: Acá iría la lógica real de registro
-        // Por ahora solo mostramos un mensaje como pide la consigna
-        System.out.println("[MAQUETA] Paciente registrado correctamente (funcionalidad en desarrollo)");
+
+        String nombre = solicitarTextoObligatorio("Nombre: ");
+        String apellido = solicitarTextoObligatorio("Apellido: ");
+        String telefono = solicitarTextoObligatorio("Telefono: ");
+        String obraSocial = solicitarTextoObligatorio("Obra social: ");
+
+        Paciente paciente = new Paciente(dni, nombre, apellido, telefono, obraSocial);
+        boolean ok = gestorPacientes.registrarPaciente(paciente);
+        if (!ok) {
+            System.out.println("Error: no se pudo registrar el paciente.");
+            return;
+        }
+
+        System.out.println("Paciente registrado correctamente.");
+        mostrarResumenPaciente(paciente);
     }
 
     private static void modificarPaciente() {
         System.out.println("\n--- Modificar Paciente ---");
-        System.out.print("DNI del paciente: ");
-        String dni = scanner.nextLine().trim();
-        
-        // TODO: Revisar si hay que validar que exista antes de pedir los nuevos datos
-        System.out.print("Nuevo nombre: ");
-        String nombre = scanner.nextLine().trim();
-        System.out.print("Nuevo apellido: ");
-        String apellido = scanner.nextLine().trim();
-        System.out.print("Nuevo telefono: ");
-        String telefono = scanner.nextLine().trim();
-        System.out.print("Nueva obra social: ");
-        String obraSocial = scanner.nextLine().trim();
-        
-        System.out.println("[MAQUETA] Datos modificados correctamente (funcionalidad en desarrollo)");
+        String dni = solicitarNumeroNoVacio("DNI del paciente: ", "DNI");
+
+        Optional<Paciente> pacienteOpt = gestorPacientes.buscarPorDni(dni);
+        if (pacienteOpt.isEmpty()) {
+            System.out.println("Error: no existe un paciente con ese DNI.");
+            return;
+        }
+
+        String nombre = solicitarTextoObligatorio("Nuevo nombre: ");
+        String apellido = solicitarTextoObligatorio("Nuevo apellido: ");
+        String telefono = solicitarTextoObligatorio("Nuevo telefono: ");
+        String obraSocial = solicitarTextoObligatorio("Nueva obra social: ");
+
+        boolean ok = gestorPacientes.modificarPaciente(dni, nombre, apellido, telefono, obraSocial);
+        if (!ok) {
+            System.out.println("Error: no se pudo modificar el paciente.");
+            return;
+        }
+
+        Paciente actualizado = gestorPacientes.buscarPorDni(dni).orElse(pacienteOpt.get());
+        System.out.println("Paciente modificado correctamente.");
+        mostrarResumenPaciente(actualizado);
     }
 
     private static void buscarPacientePorDni() {
         System.out.println("\n--- Buscar Paciente por DNI ---");
-        System.out.print("DNI a buscar: ");
-        String dni = scanner.nextLine().trim();
-        
-        // Usamos una variable aux para el resultado
-        System.out.println("[MAQUETA] Paciente encontrado: " + dni + " (funcionalidad en desarrollo)");
-        // TODO: Acá habría que mostrar los datos reales del paciente
+        String dni = solicitarNumeroNoVacio("DNI a buscar: ", "DNI");
+        Optional<Paciente> pacienteOpt = gestorPacientes.buscarPorDni(dni);
+
+        if (pacienteOpt.isEmpty()) {
+            System.out.println("No se encontro paciente con ese DNI.");
+            return;
+        }
+        mostrarResumenPaciente(pacienteOpt.get());
     }
 
     private static void buscarPacientePorNombre() {
         System.out.println("\n--- Buscar Paciente por Nombre ---");
-        System.out.print("Nombre y apellido (o parte): ");
-        String busqueda = scanner.nextLine().trim();
-        
-        System.out.println("[MAQUETA] Búsqueda realizada para: " + busqueda + " (funcionalidad en desarrollo)");
-        // TODO: Implementar búsqueda por nombre (parcial también)
+        String busqueda = solicitarTextoObligatorio("Nombre y apellido (o parte): ");
+        List<Paciente> resultados = gestorPacientes.buscarPorNombreCompleto(busqueda);
+
+        if (resultados.isEmpty()) {
+            System.out.println("No se encontraron pacientes para '" + busqueda + "'.");
+            return;
+        }
+
+        System.out.println("Resultados:");
+        for (Paciente p : resultados) {
+            System.out.println("- " + p.getDni() + " | " + p.nombreCompleto() + " | Obra social: " + p.getObraSocial());
+        }
     }
 
     private static void crearTurno(boolean esSobreturno) {
-        System.out.println("\n--- Crear Turno ---");
-        System.out.print("DNI del paciente: ");
-        String dni = scanner.nextLine().trim();
-        System.out.print("Matrícula del médico: ");
-        String matricula = scanner.nextLine().trim();
-        System.out.print("Fecha (YYYY-MM-DD): ");
-        String fechaStr = scanner.nextLine().trim();
-        System.out.print("Hora (HH:MM): ");
-        String horaStr = scanner.nextLine().trim();
-        
-        // TODO: Validar que la fecha y hora sean correctas
         String tipoTurno = esSobreturno ? "Sobreturno" : "Turno";
-        System.out.println("[MAQUETA] " + tipoTurno + " creado para " + dni + " con médico " + matricula + " (funcionalidad en desarrollo)");
+        System.out.println("\n--- Crear " + tipoTurno + " ---");
+
+        String dni = solicitarNumeroNoVacio("DNI del paciente: ", "DNI");
+        if (gestorPacientes.buscarPorDni(dni).isEmpty()) {
+            System.out.println("Error: el paciente no existe.");
+            return;
+        }
+
+        String matricula = solicitarNumeroNoVacio("Matricula del medico: ", "Matricula");
+        if (gestorMedicos.buscarMedico(matricula).isEmpty()) {
+            System.out.println("Error: el medico no existe.");
+            return;
+        }
+
+        LocalDateTime fechaHora = solicitarFechaHoraTurnoValida(esSobreturno ? null : matricula);
+        if (fechaHora == null) {
+            return;
+        }
+
+        Optional<Turno> turnoOpt = gestorTurnos.crearTurno(dni, matricula, fechaHora, esSobreturno);
+        if (turnoOpt.isEmpty()) {
+            System.out.println("Error: no se pudo crear el " + tipoTurno.toLowerCase() + ".");
+            return;
+        }
+
+        Turno turno = turnoOpt.get();
+        System.out.println(tipoTurno + " creado correctamente.");
+        System.out.println("Resumen guardado:");
+        System.out.println("- ID: " + turno.getId());
+        System.out.println("- Paciente DNI: " + turno.getDniPaciente());
+        System.out.println("- Medico matricula: " + turno.getMatriculaMedico());
+        System.out.println("- Fecha/hora: " + turno.getFechaHora().format(FORMATO_FECHA_HORA));
+        System.out.println("- Estado: " + turno.getEstado());
     }
 
     private static void cancelarTurno() {
         System.out.println("\n--- Cancelar Turno ---");
-        System.out.print("ID del turno: ");
-        String turnoId = scanner.nextLine().trim();
-        
-        System.out.println("[MAQUETA] Turno " + turnoId + " cancelado (funcionalidad en desarrollo)");
+        String turnoId = solicitarTextoObligatorio("ID del turno: ");
+        boolean ok = gestorTurnos.cancelarTurno(turnoId);
+        if (!ok) {
+            System.out.println("Error: no se pudo cancelar. Verifique ID y estado del turno.");
+            return;
+        }
+        System.out.println("Turno cancelado correctamente.");
     }
 
     private static void reprogramarTurno() {
         System.out.println("\n--- Reprogramar Turno ---");
-        System.out.print("ID del turno: ");
-        String turnoId = scanner.nextLine().trim();
-        System.out.print("Nueva fecha (YYYY-MM-DD): ");
-        String nuevaFecha = scanner.nextLine().trim();
-        System.out.print("Nueva hora (HH:MM): ");
-        String nuevaHora = scanner.nextLine().trim();
-        
-        System.out.println("[MAQUETA] Turno " + turnoId + " reprogramado (funcionalidad en desarrollo)");
+        String turnoId = solicitarTextoObligatorio("ID del turno: ");
+        Optional<Turno> turnoOpt = gestorTurnos.buscarTurno(turnoId);
+        if (turnoOpt.isEmpty()) {
+            System.out.println("Error: no existe un turno con ese ID.");
+            return;
+        }
+
+        Turno turnoActual = turnoOpt.get();
+        String matriculaValidacion = turnoActual.isSobreturno() ? null : turnoActual.getMatriculaMedico();
+        LocalDateTime nuevaFechaHora = solicitarFechaHoraTurnoValida(matriculaValidacion);
+        if (nuevaFechaHora == null) {
+            return;
+        }
+
+        boolean ok = gestorTurnos.reprogramarTurno(turnoId, nuevaFechaHora);
+        if (!ok) {
+            System.out.println("Error: no se pudo reprogramar. Verifique disponibilidad.");
+            return;
+        }
+
+        System.out.println("Turno reprogramado correctamente.");
+        System.out.println("Nueva fecha/hora: " + nuevaFechaHora.format(FORMATO_FECHA_HORA));
     }
 
     private static void consultarDisponibilidad() {
         System.out.println("\n--- Consultar Disponibilidad ---");
-        System.out.print("Matrícula del médico: ");
-        String matricula = scanner.nextLine().trim();
-        System.out.print("Fecha a consultar (YYYY-MM-DD): ");
-        String fecha = scanner.nextLine().trim();
-        
-        System.out.println("[MAQUETA] Disponibilidad consultada para médico " + matricula + " (funcionalidad en desarrollo)");
+        String matricula = solicitarNumeroNoVacio("Matricula del medico: ", "Matricula");
+        if (gestorMedicos.buscarMedico(matricula).isEmpty()) {
+            System.out.println("Error: el medico no existe.");
+            return;
+        }
+
+        LocalDate fecha = solicitarFecha("Fecha a consultar (YYYY-MM-DD): ");
+        DayOfWeek dia = fecha.getDayOfWeek();
+        List<Disponibilidad> disponibilidades = gestorMedicos.consultarDisponibilidad(matricula);
+
+        List<Disponibilidad> delDia = new ArrayList<>();
+        for (Disponibilidad d : disponibilidades) {
+            if (d.getDia().equals(dia)) {
+                delDia.add(d);
+            }
+        }
+
+        if (delDia.isEmpty()) {
+            System.out.println("No hay disponibilidad cargada para ese dia.");
+            return;
+        }
+
+        System.out.println("Disponibilidad del medico " + matricula + " para " + fecha.format(FORMATO_FECHA) + ":");
+        for (Disponibilidad d : delDia) {
+            System.out.println("- " + d.getHoraInicio().format(FORMATO_HORA) + " a " + d.getHoraFin().format(FORMATO_HORA));
+        }
     }
-    
+
     // =========================================================================
-    // FUNCIONES DEL MENU MEDICO (MAQUETAS)
+    // FUNCIONES DEL MENU MEDICO
     // =========================================================================
 
     private static void consultarTurnosMedico() {
-        System.out.println("\n--- Consultar Turnos del Médico ---");
-        System.out.print("Matrícula del médico: ");
-        String matricula = scanner.nextLine().trim();
-        System.out.print("Fecha (YYYY-MM-DD): ");
-        String fecha = scanner.nextLine().trim();
-        
-        System.out.println("[MAQUETA] Turnos consultados para médico " + matricula + " (funcionalidad en desarrollo)");
+        System.out.println("\n--- Consultar Turnos del Medico ---");
+        String matricula = solicitarNumeroNoVacio("Matricula del medico: ", "Matricula");
+        LocalDate fecha = solicitarFecha("Fecha (YYYY-MM-DD): ");
+
+        List<Turno> turnos = gestorTurnos.listarTurnosPorMedicoYFecha(matricula, fecha);
+        if (turnos.isEmpty()) {
+            System.out.println("No hay turnos para esa fecha.");
+            return;
+        }
+
+        System.out.println("Turnos asignados:");
+        for (Turno turno : turnos) {
+            System.out.println("- ID: " + turno.getId()
+                + " | Paciente: " + turno.getDniPaciente()
+                + " | Hora: " + turno.getFechaHora().toLocalTime().format(FORMATO_HORA)
+                + " | Estado: " + turno.getEstado()
+                + " | Sobreturno: " + (turno.isSobreturno() ? "SI" : "NO"));
+        }
     }
 
     private static void verHistorial() {
-        System.out.println("\n--- Ver Historial Clínico ---");
-        System.out.print("DNI del paciente: ");
-        String dni = scanner.nextLine().trim();
-        
-        System.out.println("[MAQUETA] Historial mostrado para paciente " + dni + " (funcionalidad en desarrollo)");
+        System.out.println("\n--- Ver Historial Clinico ---");
+        String dni = solicitarNumeroNoVacio("DNI del paciente: ", "DNI");
+        HistorialClinico historial = gestorHistoriales.verHistorial(dni);
+        if (historial == null) {
+            System.out.println("No existe historial para ese paciente.");
+            return;
+        }
+
+        List<EntradaHistorial> entradas = historial.getEntradas();
+        if (entradas.isEmpty()) {
+            System.out.println("El historial no tiene entradas.");
+            return;
+        }
+
+        System.out.println("Historial de paciente " + dni + ":");
+        for (EntradaHistorial e : entradas) {
+            System.out.println("- " + e.getFecha().format(FORMATO_FECHA_HORA) + " | " + e.getResumen()
+                + " | Dx: " + e.getDiagnostico() + " | Estudios: " + e.getEstudios());
+        }
     }
 
     private static void registrarConsulta() {
-        System.out.println("\n--- Registrar Consulta Médica ---");
-        System.out.print("DNI del paciente: ");
-        String dni = scanner.nextLine().trim();
-        System.out.print("Resumen de la consulta: ");
-        String resumen = scanner.nextLine().trim();
-        System.out.print("Diagnóstico: ");
-        String diagnostico = scanner.nextLine().trim();
+        System.out.println("\n--- Registrar Consulta Medica ---");
+        String dni = solicitarNumeroNoVacio("DNI del paciente: ", "DNI");
+        if (gestorPacientes.buscarPorDni(dni).isEmpty()) {
+            System.out.println("Error: el paciente no existe.");
+            return;
+        }
+
+        String resumen = solicitarTextoObligatorio("Resumen de la consulta: ");
+        String diagnostico = solicitarTextoObligatorio("Diagnostico: ");
         System.out.print("Estudios (si corresponde): ");
         String estudios = scanner.nextLine().trim();
-        
-        System.out.println("[MAQUETA] Consulta registrada en historial (funcionalidad en desarrollo)");
+
+        boolean ok = gestorHistoriales.registrarConsulta(RolUsuario.MEDICO, dni, resumen, diagnostico, estudios);
+        if (!ok) {
+            System.out.println("Error: no se pudo registrar la consulta.");
+            return;
+        }
+
+        System.out.println("Consulta registrada correctamente para paciente DNI " + dni + ".");
     }
 
     private static void actualizarDiagnostico() {
-        System.out.println("\n--- Actualizar Diagnóstico ---");
-        System.out.print("DNI del paciente: ");
-        String dni = scanner.nextLine().trim();
-        System.out.print("Nuevo diagnóstico: ");
-        String diagnostico = scanner.nextLine().trim();
-        
-        System.out.println("[MAQUETA] Diagnóstico actualizado (funcionalidad en desarrollo)");
+        System.out.println("\n--- Actualizar Diagnostico ---");
+        String dni = solicitarNumeroNoVacio("DNI del paciente: ", "DNI");
+        String diagnostico = solicitarTextoObligatorio("Nuevo diagnostico: ");
+        boolean ok = gestorHistoriales.actualizarDiagnostico(dni, diagnostico);
+        if (!ok) {
+            System.out.println("Error: no hay historial o no hay entradas para actualizar.");
+            return;
+        }
+        System.out.println("Diagnostico actualizado correctamente.");
     }
 
     private static void registrarEstudio() {
         System.out.println("\n--- Registrar Estudio ---");
-        System.out.print("DNI del paciente: ");
-        String dni = scanner.nextLine().trim();
-        System.out.print("Descripción del estudio y resultado: ");
-        String estudio = scanner.nextLine().trim();
-        
-        System.out.println("[MAQUETA] Estudio registrado (funcionalidad en desarrollo)");
+        String dni = solicitarNumeroNoVacio("DNI del paciente: ", "DNI");
+        String estudio = solicitarTextoObligatorio("Descripcion del estudio y resultado: ");
+        boolean ok = gestorHistoriales.actualizarEstudios(dni, estudio);
+        if (!ok) {
+            System.out.println("Error: no hay historial o no hay entradas para actualizar.");
+            return;
+        }
+        System.out.println("Estudio actualizado correctamente.");
     }
 
     private static void marcarTurnoAtendido() {
         System.out.println("\n--- Marcar Turno como Atendido ---");
-        System.out.print("ID del turno: ");
-        String turnoId = scanner.nextLine().trim();
-        
-        System.out.println("[MAQUETA] Turno " + turnoId + " marcado como atendido (funcionalidad en desarrollo)");
+        String turnoId = solicitarTextoObligatorio("ID del turno: ");
+        boolean ok = gestorTurnos.marcarAtendido(turnoId);
+        if (!ok) {
+            System.out.println("Error: no se pudo marcar el turno. Verifique el ID.");
+            return;
+        }
+        System.out.println("Turno marcado como atendido.");
     }
 
     private static void cancelarJornada() {
-        System.out.println("\n--- Cancelar Jornada Médica ---");
-        System.out.print("Matrícula del médico: ");
-        String matricula = scanner.nextLine().trim();
-        System.out.print("Fecha de la jornada (YYYY-MM-DD): ");
-        String fechaStr = scanner.nextLine().trim();
-        
-        System.out.println("[MAQUETA] Jornada cancelada para médico " + matricula + " (funcionalidad en desarrollo)");
+        System.out.println("\n--- Cancelar Jornada Medica ---");
+        String matricula = solicitarNumeroNoVacio("Matricula del medico: ", "Matricula");
+        LocalDate fecha = solicitarFecha("Fecha de la jornada (YYYY-MM-DD): ");
+        int cancelados = gestorTurnos.cancelarTurnosDeJornada(matricula, fecha);
+        System.out.println("Jornada procesada. Turnos cancelados: " + cancelados);
     }
 
     private static void verNotificaciones() {
         System.out.println("\n--- Ver Notificaciones ---");
-        System.out.print("Matrícula del médico: ");
-        String matricula = scanner.nextLine().trim();
-        
-        System.out.println("[MAQUETA] Notificaciones mostradas (funcionalidad en desarrollo)");
+        String matricula = solicitarNumeroNoVacio("Matricula del medico: ", "Matricula");
+        List<String> notificaciones = gestorNotifs.verNotificaciones(matricula);
+        if (notificaciones.isEmpty()) {
+            System.out.println("No hay notificaciones.");
+            return;
+        }
+        System.out.println("Notificaciones:");
+        for (String mensaje : notificaciones) {
+            System.out.println("- " + mensaje);
+        }
+        gestorNotifs.limpiarNotificaciones(matricula);
+        System.out.println("Notificaciones marcadas como leidas.");
     }
-    
+
     // =========================================================================
-    // FUNCIONES DEL MENU ADMINISTRADOR (MAQUETAS)
+    // FUNCIONES DEL MENU ADMINISTRADOR
     // =========================================================================
 
     private static void registrarMedico() {
-        System.out.println("\n--- Registrar Médico ---");
-        System.out.print("Matrícula profesional: ");
-        String matricula = scanner.nextLine().trim();
-        System.out.print("Nombre: ");
-        String nombre = scanner.nextLine().trim();
-        System.out.print("Apellido: ");
-        String apellido = scanner.nextLine().trim();
-        System.out.print("Especialidad: ");
-        String especialidad = scanner.nextLine().trim();
-        
-        System.out.println("[MAQUETA] Médico registrado correctamente (funcionalidad en desarrollo)");
+        System.out.println("\n--- Registrar Medico ---");
+        String matricula = solicitarNumeroNoVacio("Matricula profesional: ", "Matricula");
+        if (gestorMedicos.buscarMedico(matricula).isPresent()) {
+            System.out.println("Error: ya existe un medico con esa matricula.");
+            return;
+        }
+
+        String nombre = solicitarTextoObligatorio("Nombre: ");
+        String apellido = solicitarTextoObligatorio("Apellido: ");
+        String especialidad = solicitarTextoObligatorio("Especialidad: ");
+
+        Medico medico = new Medico(matricula, nombre, apellido, especialidad);
+        boolean ok = gestorMedicos.registrarMedico(medico);
+        if (!ok) {
+            System.out.println("Error: no se pudo registrar el medico.");
+            return;
+        }
+
+        System.out.println("Medico registrado correctamente.");
+        System.out.println("Resumen guardado:");
+        System.out.println("- Matricula: " + medico.getMatricula());
+        System.out.println("- Nombre: " + medico.getNombre() + " " + medico.getApellido());
+        System.out.println("- Especialidad: " + medico.getEspecialidad());
     }
 
     private static void agregarDisponibilidad() {
         System.out.println("\n--- Agregar Disponibilidad ---");
-        System.out.print("Matrícula del médico: ");
-        String matricula = scanner.nextLine().trim();
-        System.out.print("Día de la semana (1=Lunes, 7=Domingo): ");
-        String diaStr = scanner.nextLine().trim();
-        System.out.print("Hora de inicio (HH:MM): ");
-        String inicioStr = scanner.nextLine().trim();
-        System.out.print("Hora de fin (HH:MM): ");
-        String finStr = scanner.nextLine().trim();
-        
-        System.out.println("[MAQUETA] Disponibilidad agregada (funcionalidad en desarrollo)");
+        String matricula = solicitarNumeroNoVacio("Matricula del medico: ", "Matricula");
+        int diaNum = solicitarDiaSemana("Dia de la semana (1=Lunes, 7=Domingo): ");
+        LocalTime inicio = solicitarHora("Hora de inicio (HH:MM): ");
+        LocalTime fin = solicitarHora("Hora de fin (HH:MM): ");
+
+        if (!inicio.isBefore(fin)) {
+            System.out.println("Error: la hora de inicio debe ser anterior a la de fin.");
+            return;
+        }
+
+        Disponibilidad disponibilidad = new Disponibilidad(DayOfWeek.of(diaNum), inicio, fin);
+        boolean ok = gestorMedicos.agregarDisponibilidad(matricula, disponibilidad);
+        if (!ok) {
+            System.out.println("Error: no se pudo agregar disponibilidad (medico inexistente o solapamiento).");
+            return;
+        }
+        System.out.println("Disponibilidad agregada correctamente.");
     }
 
     private static void reemplazarDisponibilidadSimple() {
         System.out.println("\n--- Reemplazar Disponibilidad ---");
-        System.out.print("Matrícula del médico: ");
-        String matricula = scanner.nextLine().trim();
-        System.out.println("Se reemplazará toda la disponibilidad por una única franja.");
-        System.out.print("Día (1=Lunes, 7=Domingo): ");
-        String diaStr = scanner.nextLine().trim();
-        System.out.print("Hora inicio (HH:MM): ");
-        String inicioStr = scanner.nextLine().trim();
-        System.out.print("Hora fin (HH:MM): ");
-        String finStr = scanner.nextLine().trim();
-        
-        System.out.println("[MAQUETA] Disponibilidad reemplazada (funcionalidad en desarrollo)");
+        String matricula = solicitarNumeroNoVacio("Matricula del medico: ", "Matricula");
+        int diaNum = solicitarDiaSemana("Dia (1=Lunes, 7=Domingo): ");
+        LocalTime inicio = solicitarHora("Hora inicio (HH:MM): ");
+        LocalTime fin = solicitarHora("Hora fin (HH:MM): ");
+
+        if (!inicio.isBefore(fin)) {
+            System.out.println("Error: la hora de inicio debe ser anterior a la de fin.");
+            return;
+        }
+
+        List<Disponibilidad> nuevas = new ArrayList<>();
+        nuevas.add(new Disponibilidad(DayOfWeek.of(diaNum), inicio, fin));
+        boolean ok = gestorMedicos.reemplazarDisponibilidades(matricula, nuevas);
+        if (!ok) {
+            System.out.println("Error: no se pudo reemplazar disponibilidad (medico inexistente).");
+            return;
+        }
+        System.out.println("Disponibilidad reemplazada correctamente.");
     }
 
     private static void registrarEmpleado() {
         System.out.println("\n--- Registrar Empleado ---");
-        System.out.print("Legajo: ");
-        String legajo = scanner.nextLine().trim();
-        System.out.print("Nombre completo: ");
-        String nombre = scanner.nextLine().trim();
-        System.out.print("Rol (RECEPCIONISTA, MEDICO, ADMINISTRADOR): ");
-        String rolStr = scanner.nextLine().trim().toUpperCase();
-        
-        System.out.println("[MAQUETA] Empleado registrado con rol " + rolStr + " (funcionalidad en desarrollo)");
+        String legajo = solicitarTextoObligatorio("Legajo: ");
+        if (gestorEmpleados.buscarPorLegajo(legajo).isPresent()) {
+            System.out.println("Error: ya existe un empleado con ese legajo.");
+            return;
+        }
+
+        String nombre = solicitarTextoObligatorio("Nombre completo: ");
+        RolUsuario rol = solicitarRol("Rol (RECEPCIONISTA, MEDICO, ADMINISTRADOR): ");
+        boolean ok = gestorEmpleados.registrarEmpleado(legajo, nombre, rol);
+        if (!ok) {
+            System.out.println("Error: no se pudo registrar empleado.");
+            return;
+        }
+        System.out.println("Empleado registrado correctamente.");
+        System.out.println("Resumen guardado:");
+        System.out.println("- Legajo: " + legajo);
+        System.out.println("- Nombre: " + nombre);
+        System.out.println("- Rol: " + rol);
     }
-    
+
+    private static void verAgendaConsolidada() {
+        System.out.println("\n--- Agenda Consolidada ---");
+        List<Turno> turnos = gestorTurnos.listarTodos();
+        if (turnos.isEmpty()) {
+            System.out.println("No hay turnos registrados.");
+            return;
+        }
+
+        turnos.sort(Comparator.comparing(Turno::getFechaHora));
+        System.out.println("Fecha/Hora | Paciente | Medico | Estado | Sobreturno");
+        for (Turno turno : turnos) {
+            String nombrePaciente = gestorPacientes.buscarPorDni(turno.getDniPaciente())
+                .map(Paciente::nombreCompleto)
+                .orElse("Paciente no encontrado (" + turno.getDniPaciente() + ")");
+
+            String nombreMedico = gestorMedicos.buscarMedico(turno.getMatriculaMedico())
+                .map(m -> m.getNombre() + " " + m.getApellido())
+                .orElse("Medico no encontrado (" + turno.getMatriculaMedico() + ")");
+
+            System.out.println(turno.getFechaHora().format(FORMATO_FECHA_HORA)
+                + " | " + nombrePaciente
+                + " | " + nombreMedico
+                + " | " + turno.getEstado()
+                + " | " + (turno.isSobreturno() ? "SI" : "NO"));
+        }
+    }
+
+    private static void verEstadisticasDelDia() {
+        System.out.println("\n--- Estadisticas del Dia ---");
+        LocalDate hoy = LocalDate.now();
+
+        long total = gestorTurnos.contarTurnosPorFecha(hoy);
+        long cancelados = gestorTurnos.contarTurnosPorEstadoEnFecha(hoy, EstadoTurno.CANCELADO);
+        long atendidos = gestorTurnos.contarTurnosPorEstadoEnFecha(hoy, EstadoTurno.ATENDIDO);
+
+        double porcentajeCancelados = total == 0 ? 0.0 : (cancelados * 100.0) / total;
+        double porcentajeAtendidos = total == 0 ? 0.0 : (atendidos * 100.0) / total;
+
+        System.out.println("Total de turnos de hoy: " + total);
+        System.out.println(String.format("Porcentaje cancelados: %.2f%%", porcentajeCancelados));
+        System.out.println(String.format("Porcentaje atendidos: %.2f%%", porcentajeAtendidos));
+
+        Optional<String> matriculaOpt = gestorTurnos.obtenerMatriculaConMasSobreturnos();
+        if (matriculaOpt.isEmpty()) {
+            System.out.println("Medico con mas sobreturnos: sin registros.");
+            return;
+        }
+
+        String matricula = matriculaOpt.get();
+        long cantidadSobreturnos = gestorTurnos.contarSobreturnosPorMedico(matricula);
+        String nombreMedico = gestorMedicos.buscarMedico(matricula)
+            .map(m -> m.getNombre() + " " + m.getApellido())
+            .orElse("Matricula " + matricula);
+        System.out.println("Medico con mas sobreturnos: " + nombreMedico + " (" + cantidadSobreturnos + ")");
+    }
+
     // =========================================================================
-    // MÉTODOS AUXILIARES
+    // METODOS AUXILIARES
     // =========================================================================
-    
-    /**
-     * Muestra un mensaje si el sistema está fuera de horario laboral.
-     * Lo pusimos porque en la clínica dijeron que solo atienden de 8 a 20hs.
-     */
+
+    private static String solicitarTextoObligatorio(String etiqueta) {
+        while (true) {
+            System.out.print(etiqueta);
+            String valor = scanner.nextLine().trim();
+            if (!valor.isEmpty()) {
+                return valor;
+            }
+            System.out.println("Error: este campo no puede estar vacio.");
+        }
+    }
+
+    private static String solicitarNumeroNoVacio(String etiqueta, String nombreCampo) {
+        while (true) {
+            String valor = solicitarTextoObligatorio(etiqueta);
+            if (valor.matches("\\d+")) {
+                return valor;
+            }
+            System.out.println("Error: " + nombreCampo + " debe ser numerico.");
+        }
+    }
+
+    private static LocalDate solicitarFecha(String etiqueta) {
+        while (true) {
+            System.out.print(etiqueta);
+            String fechaStr = scanner.nextLine().trim();
+            try {
+                return LocalDate.parse(fechaStr, FORMATO_FECHA);
+            } catch (DateTimeParseException e) {
+                System.out.println("Error: formato invalido. Use YYYY-MM-DD.");
+            }
+        }
+    }
+
+    private static LocalTime solicitarHora(String etiqueta) {
+        while (true) {
+            System.out.print(etiqueta);
+            String horaStr = scanner.nextLine().trim();
+            try {
+                return LocalTime.parse(horaStr, FORMATO_HORA);
+            } catch (DateTimeParseException e) {
+                System.out.println("Error: formato invalido. Use HH:MM.");
+            }
+        }
+    }
+
+    private static LocalDateTime solicitarFechaHoraTurnoValida(String matriculaParaValidarDisponibilidad) {
+        while (true) {
+            LocalDate fecha = solicitarFecha("Fecha (YYYY-MM-DD): ");
+            LocalTime hora = solicitarHora("Hora (HH:MM): ");
+            LocalDateTime fechaHora = LocalDateTime.of(fecha, hora);
+
+            if (fecha.isBefore(LocalDate.now())) {
+                System.out.println("Error: la fecha no puede ser anterior a hoy.");
+                continue;
+            }
+
+            if (!horaEnHorarioLaboral(hora)) {
+                System.out.println("Error: la hora debe estar dentro del horario laboral (08:00 a 20:00).");
+                continue;
+            }
+
+            if (matriculaParaValidarDisponibilidad != null
+                && !gestorMedicos.estaDisponible(matriculaParaValidarDisponibilidad, fechaHora)) {
+                System.out.println("Error: el medico no tiene disponibilidad en ese horario.");
+                continue;
+            }
+
+            return fechaHora;
+        }
+    }
+
+    private static int solicitarDiaSemana(String etiqueta) {
+        while (true) {
+            System.out.print(etiqueta);
+            String diaStr = scanner.nextLine().trim();
+            try {
+                int dia = Integer.parseInt(diaStr);
+                if (dia >= 1 && dia <= 7) {
+                    return dia;
+                }
+                System.out.println("Error: el dia debe estar entre 1 y 7.");
+            } catch (NumberFormatException e) {
+                System.out.println("Error: dia invalido. Debe ser numerico.");
+            }
+        }
+    }
+
+    private static RolUsuario solicitarRol(String etiqueta) {
+        while (true) {
+            System.out.print(etiqueta);
+            String rolStr = scanner.nextLine().trim().toUpperCase();
+            try {
+                return RolUsuario.valueOf(rolStr);
+            } catch (IllegalArgumentException e) {
+                System.out.println("Error: rol invalido. Opciones: RECEPCIONISTA, MEDICO, ADMINISTRADOR.");
+            }
+        }
+    }
+
+    private static boolean horaEnHorarioLaboral(LocalTime hora) {
+        return !hora.isBefore(HORA_INICIO_LABORAL) && !hora.isAfter(HORA_FIN_LABORAL);
+    }
+
+    private static void mostrarResumenPaciente(Paciente paciente) {
+        System.out.println("Resumen guardado:");
+        System.out.println("- DNI: " + paciente.getDni());
+        System.out.println("- Nombre completo: " + paciente.nombreCompleto());
+        System.out.println("- Telefono: " + paciente.getTelefono());
+        System.out.println("- Obra social: " + paciente.getObraSocial());
+    }
+
     private static void informarHorarioLaboral() {
         LocalTime now = LocalTime.now();
-        boolean horarioLaboral = !now.isBefore(LocalTime.of(8, 0)) && !now.isAfter(LocalTime.of(20, 0));
+        boolean horarioLaboral = !now.isBefore(HORA_INICIO_LABORAL) && !now.isAfter(HORA_FIN_LABORAL);
         if (!horarioLaboral) {
-            System.out.println("[INFO] Fuera de horario laboral (08:00-20:00). Sistema en modo base de prueba.");
+            System.out.println("[INFO] Fuera de horario laboral (08:00-20:00).");
         }
     }
 }

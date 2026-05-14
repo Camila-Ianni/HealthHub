@@ -6,7 +6,9 @@ import com.healthhub.domain.Turno;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -231,5 +233,68 @@ public class GestorTurnos {
      */
     public List<Turno> listarTodos() {
         return new ArrayList<>(turnos);
+    }
+
+    /**
+     * Cuenta turnos en una fecha puntual.
+     */
+    public long contarTurnosPorFecha(LocalDate fecha) {
+        long total = 0;
+        for (Turno turno : turnos) {
+            if (turno.getFechaHora().toLocalDate().equals(fecha)) {
+                total++;
+            }
+        }
+        return total;
+    }
+
+    /**
+     * Cuenta turnos por estado en una fecha puntual.
+     */
+    public long contarTurnosPorEstadoEnFecha(LocalDate fecha, EstadoTurno estado) {
+        long total = 0;
+        for (Turno turno : turnos) {
+            if (turno.getFechaHora().toLocalDate().equals(fecha) && turno.getEstado() == estado) {
+                total++;
+            }
+        }
+        return total;
+    }
+
+    /**
+     * Devuelve la matricula con mayor cantidad de sobreturnos.
+     */
+    public Optional<String> obtenerMatriculaConMasSobreturnos() {
+        Map<String, Long> sobreturnosPorMedico = new HashMap<>();
+        for (Turno turno : turnos) {
+            if (turno.isSobreturno()) {
+                String matricula = turno.getMatriculaMedico();
+                sobreturnosPorMedico.put(matricula, sobreturnosPorMedico.getOrDefault(matricula, 0L) + 1L);
+            }
+        }
+
+        String mejorMatricula = null;
+        long mayor = -1;
+        for (Map.Entry<String, Long> entry : sobreturnosPorMedico.entrySet()) {
+            if (entry.getValue() > mayor) {
+                mayor = entry.getValue();
+                mejorMatricula = entry.getKey();
+            }
+        }
+
+        return Optional.ofNullable(mejorMatricula);
+    }
+
+    /**
+     * Cuenta sobreturnos acumulados de un medico.
+     */
+    public long contarSobreturnosPorMedico(String matricula) {
+        long total = 0;
+        for (Turno turno : turnos) {
+            if (turno.isSobreturno() && turno.getMatriculaMedico().equals(matricula)) {
+                total++;
+            }
+        }
+        return total;
     }
 }
