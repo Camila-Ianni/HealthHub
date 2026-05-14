@@ -23,6 +23,7 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,6 +56,103 @@ public class Persistencia {
     
     public Persistencia(Path rutaBase) {
         this.rutaBase = rutaBase;
+    }
+
+    /**
+     * Representa una fila resultado de la agenda consolidada (simulación SQL).
+     */
+    public static class AgendaConsolidadaFila {
+        private final LocalDateTime fechaHora;
+        private final String nombrePaciente;
+        private final String nombreMedico;
+        private final EstadoTurno estado;
+        private final boolean sobreturno;
+
+        public AgendaConsolidadaFila(
+            LocalDateTime fechaHora,
+            String nombrePaciente,
+            String nombreMedico,
+            EstadoTurno estado,
+            boolean sobreturno
+        ) {
+            this.fechaHora = fechaHora;
+            this.nombrePaciente = nombrePaciente;
+            this.nombreMedico = nombreMedico;
+            this.estado = estado;
+            this.sobreturno = sobreturno;
+        }
+
+        public LocalDateTime getFechaHora() {
+            return fechaHora;
+        }
+
+        public String getNombrePaciente() {
+            return nombrePaciente;
+        }
+
+        public String getNombreMedico() {
+            return nombreMedico;
+        }
+
+        public EstadoTurno getEstado() {
+            return estado;
+        }
+
+        public boolean isSobreturno() {
+            return sobreturno;
+        }
+    }
+
+    /**
+     * Devuelve una consulta SQL representativa para la agenda consolidada.
+     */
+    public String obtenerConsultaAgendaConsolidada() {
+        return "SELECT t.FechaHora, p.Nombre || ' ' || p.Apellido AS Paciente, "
+            + "m.Nombre || ' ' || m.Apellido AS Medico, t.Estado, t.Sobreturno "
+            + "FROM Turno t "
+            + "INNER JOIN Paciente p ON p.DNI = t.DniPaciente "
+            + "INNER JOIN Medico m ON m.Matricula = t.MatriculaMedico "
+            + "ORDER BY t.FechaHora";
+    }
+
+    /**
+     * Simula un SELECT con INNER JOIN entre Turno, Paciente y Medico.
+     * Solo devuelve filas con coincidencias en las tres fuentes.
+     */
+    public List<AgendaConsolidadaFila> consultarAgendaConsolidadaInnerJoin(
+        List<Turno> turnos,
+        List<Paciente> pacientes,
+        List<Medico> medicos
+    ) {
+        Map<String, Paciente> pacientePorDni = new HashMap<>();
+        for (Paciente paciente : pacientes) {
+            pacientePorDni.put(paciente.getDni(), paciente);
+        }
+
+        Map<String, Medico> medicoPorMatricula = new HashMap<>();
+        for (Medico medico : medicos) {
+            medicoPorMatricula.put(medico.getMatricula(), medico);
+        }
+
+        List<AgendaConsolidadaFila> filas = new ArrayList<>();
+        for (Turno turno : turnos) {
+            Paciente paciente = pacientePorDni.get(turno.getDniPaciente());
+            Medico medico = medicoPorMatricula.get(turno.getMatriculaMedico());
+            if (paciente == null || medico == null) {
+                continue; // INNER JOIN: si falta una relación, no hay fila.
+            }
+
+            filas.add(new AgendaConsolidadaFila(
+                turno.getFechaHora(),
+                paciente.getNombre() + " " + paciente.getApellido(),
+                medico.getNombre() + " " + medico.getApellido(),
+                turno.getEstado(),
+                turno.isSobreturno()
+            ));
+        }
+
+        filas.sort(Comparator.comparing(AgendaConsolidadaFila::getFechaHora));
+        return filas;
     }
     
     // =========================================================================

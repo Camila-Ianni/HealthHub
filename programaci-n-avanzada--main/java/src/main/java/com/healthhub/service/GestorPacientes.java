@@ -3,6 +3,7 @@ package com.healthhub.service;
 import com.healthhub.domain.HistorialClinico;
 import com.healthhub.domain.Paciente;
 
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -173,11 +174,12 @@ public class GestorPacientes {
     
     /**
      * Normaliza un string para que las búsquedas sean más fáciles.
-     * Pasa a minúsculas, saca espacios extra y deja todo más limpio.
-     * 
-     * TODO: Sacar los acentos también (ej: "María" -> "maria")
+     * Pasa a minúsculas, elimina diacríticos y saca espacios extra.
      */
     private String normalizar(String valor) {
-        return valor.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+        String limpio = valor.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+        String sinAcentos = Normalizer.normalize(limpio, Normalizer.Form.NFD)
+            .replaceAll("\\p{M}", "");
+        return sinAcentos.replaceAll("[^\\p{Alnum}\\s]", "");
     }
 }

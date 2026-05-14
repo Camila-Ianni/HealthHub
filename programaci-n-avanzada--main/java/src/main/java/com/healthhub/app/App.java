@@ -25,7 +25,6 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -373,14 +372,21 @@ public class App {
         String obraSocial = solicitarTextoObligatorio("Obra social: ");
 
         Paciente paciente = new Paciente(dni, nombre, apellido, telefono, obraSocial);
+        mostrarResumenPaciente(paciente);
+        if (!confirmarDatos()) {
+            System.out.println("Operacion cancelada. No se guardaron cambios.");
+            return;
+        }
+
         boolean ok = gestorPacientes.registrarPaciente(paciente);
         if (!ok) {
             System.out.println("Error: no se pudo registrar el paciente.");
             return;
         }
 
+        persistencia.guardarPacientes(gestorPacientes.listarTodos());
+        persistencia.guardarHistoriales(gestorHistoriales.listarTodos());
         System.out.println("Paciente registrado correctamente.");
-        mostrarResumenPaciente(paciente);
     }
 
     private static void modificarPaciente() {
@@ -457,10 +463,15 @@ public class App {
         if (fechaHora == null) {
             return;
         }
+        if (fechaHora.isBefore(LocalDateTime.now())) {
+            System.out.println("Error: no se puede crear un turno en una fecha/hora anterior a la actual.");
+            return;
+        }
 
         Optional<Turno> turnoOpt = gestorTurnos.crearTurno(dni, matricula, fechaHora, esSobreturno);
         if (turnoOpt.isEmpty()) {
-            System.out.println("Error: no se pudo crear el " + tipoTurno.toLowerCase() + ".");
+            System.out.println("Error: no se pudo crear el " + tipoTurno.toLowerCase()
+                + ". Verifique disponibilidad o fecha/hora.");
             return;
         }
 
@@ -686,17 +697,20 @@ public class App {
         String especialidad = solicitarTextoObligatorio("Especialidad: ");
 
         Medico medico = new Medico(matricula, nombre, apellido, especialidad);
+        mostrarResumenMedico(medico);
+        if (!confirmarDatos()) {
+            System.out.println("Operacion cancelada. No se guardaron cambios.");
+            return;
+        }
+
         boolean ok = gestorMedicos.registrarMedico(medico);
         if (!ok) {
             System.out.println("Error: no se pudo registrar el medico.");
             return;
         }
 
+        persistencia.guardarMedicos(gestorMedicos.listarTodos());
         System.out.println("Medico registrado correctamente.");
-        System.out.println("Resumen guardado:");
-        System.out.println("- Matricula: " + medico.getMatricula());
-        System.out.println("- Nombre: " + medico.getNombre() + " " + medico.getApellido());
-        System.out.println("- Especialidad: " + medico.getEspecialidad());
     }
 
     private static void agregarDisponibilidad() {
@@ -766,28 +780,25 @@ public class App {
 
     private static void verAgendaConsolidada() {
         System.out.println("\n--- Agenda Consolidada ---");
-        List<Turno> turnos = gestorTurnos.listarTodos();
-        if (turnos.isEmpty()) {
+        List<Persistencia.AgendaConsolidadaFila> filas = persistencia.consultarAgendaConsolidadaInnerJoin(
+            gestorTurnos.listarTodos(),
+            gestorPacientes.listarTodos(),
+            gestorMedicos.listarTodos()
+        );
+        if (filas.isEmpty()) {
             System.out.println("No hay turnos registrados.");
             return;
         }
 
-        turnos.sort(Comparator.comparing(Turno::getFechaHora));
+        System.out.println("Consulta SQL (simulada):");
+        System.out.println(persistencia.obtenerConsultaAgendaConsolidada());
         System.out.println("Fecha/Hora | Paciente | Medico | Estado | Sobreturno");
-        for (Turno turno : turnos) {
-            String nombrePaciente = gestorPacientes.buscarPorDni(turno.getDniPaciente())
-                .map(Paciente::nombreCompleto)
-                .orElse("Paciente no encontrado (" + turno.getDniPaciente() + ")");
-
-            String nombreMedico = gestorMedicos.buscarMedico(turno.getMatriculaMedico())
-                .map(m -> m.getNombre() + " " + m.getApellido())
-                .orElse("Medico no encontrado (" + turno.getMatriculaMedico() + ")");
-
-            System.out.println(turno.getFechaHora().format(FORMATO_FECHA_HORA)
-                + " | " + nombrePaciente
-                + " | " + nombreMedico
-                + " | " + turno.getEstado()
-                + " | " + (turno.isSobreturno() ? "SI" : "NO"));
+        for (Persistencia.AgendaConsolidadaFila fila : filas) {
+            System.out.println(fila.getFechaHora().format(FORMATO_FECHA_HORA)
+                + " | " + fila.getNombrePaciente()
+                + " | " + fila.getNombreMedico()
+                + " | " + fila.getEstado()
+                + " | " + (fila.isSobreturno() ? "SI" : "NO"));
         }
     }
 
@@ -875,8 +886,8 @@ public class App {
             LocalTime hora = solicitarHora("Hora (HH:MM): ");
             LocalDateTime fechaHora = LocalDateTime.of(fecha, hora);
 
-            if (fecha.isBefore(LocalDate.now())) {
-                System.out.println("Error: la fecha no puede ser anterior a hoy.");
+            if (fechaHora.isBefore(LocalDateTime.now())) {
+                System.out.println("Error: la fecha/hora no puede ser anterior a la actual.");
                 continue;
             }
 
@@ -928,11 +939,32 @@ public class App {
     }
 
     private static void mostrarResumenPaciente(Paciente paciente) {
-        System.out.println("Resumen guardado:");
+        System.out.println("Resumen de confirmacion:");
         System.out.println("- DNI: " + paciente.getDni());
         System.out.println("- Nombre completo: " + paciente.nombreCompleto());
         System.out.println("- Telefono: " + paciente.getTelefono());
         System.out.println("- Obra social: " + paciente.getObraSocial());
+    }
+
+    private static void mostrarResumenMedico(Medico medico) {
+        System.out.println("Resumen de confirmacion:");
+        System.out.println("- Matricula: " + medico.getMatricula());
+        System.out.println("- Nombre: " + medico.getNombre() + " " + medico.getApellido());
+        System.out.println("- Especialidad: " + medico.getEspecialidad());
+    }
+
+    private static boolean confirmarDatos() {
+        while (true) {
+            System.out.print("Son estos datos correctos? (S/N): ");
+            String respuesta = scanner.nextLine().trim().toUpperCase();
+            if ("S".equals(respuesta)) {
+                return true;
+            }
+            if ("N".equals(respuesta)) {
+                return false;
+            }
+            System.out.println("Respuesta invalida. Ingrese S o N.");
+        }
     }
 
     private static void informarHorarioLaboral() {

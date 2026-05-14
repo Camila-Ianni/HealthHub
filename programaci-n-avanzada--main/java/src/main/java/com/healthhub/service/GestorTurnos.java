@@ -43,6 +43,10 @@ public class GestorTurnos {
      * @return un Optional con el turno creado, o vacío si no se pudo crear
      */
     public Optional<Turno> crearTurno(String dniPaciente, String matriculaMedico, LocalDateTime fechaHora, boolean sobreturno) {
+        if (fechaHora.isBefore(LocalDateTime.now())) {
+            return Optional.empty();
+        }
+
         // Generamos un ID único para el turno
         String idTurno = UUID.randomUUID().toString();
         
