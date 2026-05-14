@@ -30,9 +30,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Scanner;
 
+
 /**
- * App - Clase principal del sistema Health Hub.
- * Implementa login por legajo, menues por rol y funcionalidades de gestion.
+ * @author Camila Ianni
  */
 public class App {
 
@@ -103,7 +103,7 @@ public class App {
         persistencia = new Persistencia(RUTA_DATOS);
         cargarBackup(CARPETA_BACKUP);
 
-        System.out.println("[INFO] Sistema inicializado correctamente.");
+        System.out.println("Sistema inicializado.");
         informarHorarioLaboral();
     }
 
@@ -122,12 +122,12 @@ public class App {
                 continue;
             }
 
-            Optional<Empleado> empleadoOpt = gestorEmpleados.buscarPorLegajo(legajo);
-            if (empleadoOpt.isPresent()) {
-                return empleadoOpt;
+            Optional<Empleado> empleadoEncontrado = gestorEmpleados.buscarPorLegajo(legajo);
+            if (empleadoEncontrado.isPresent()) {
+                return empleadoEncontrado;
             }
 
-            System.out.println("Error: no existe un empleado con legajo '" + legajo + "'.");
+            System.out.println("Acceso denegado: legajo no registrado.");
             System.out.print("1. Reintentar | 0. Salir: ");
             String opcion = scanner.nextLine().trim();
             if ("0".equals(opcion)) {
@@ -168,7 +168,7 @@ public class App {
             gestorEmpleados.registrarEmpleado(empleado.getLegajo(), empleado.getNombre(), empleado.getRol());
         }
 
-        System.out.println("[INFO] Datos cargados: " + pacientesCargados.size() + " pacientes, "
+        System.out.println("Datos cargados: " + pacientesCargados.size() + " pacientes, "
             + medicosCargados.size() + " medicos, " + turnosCargados.size() + " turnos.");
     }
 
@@ -183,18 +183,15 @@ public class App {
     }
 
     private static void cargarBackup(String carpeta) {
-        System.out.println("[INFO] Cargando backup desde '" + carpeta + "'...");
+        System.out.println("Recuperando datos desde '" + carpeta + "'...");
         cargarDatosDeArchivos();
     }
 
     private static void guardarBackup(String carpeta) {
-        System.out.println("[INFO] Guardando backup en '" + carpeta + "'...");
+        System.out.println("Guardando cambios en '" + carpeta + "'...");
         guardarDatosEnArchivos();
     }
 
-    // =========================================================================
-    // MENU RECEPCIONISTA
-    // =========================================================================
 
     private static void menuRecepcionista() {
         boolean volver = false;
@@ -251,9 +248,6 @@ public class App {
         }
     }
 
-    // =========================================================================
-    // MENU MEDICO
-    // =========================================================================
 
     private static void menuMedico() {
         boolean volver = false;
@@ -306,9 +300,6 @@ public class App {
         }
     }
 
-    // =========================================================================
-    // MENU ADMINISTRADOR
-    // =========================================================================
 
     private static void menuAdministrador() {
         boolean volver = false;
@@ -353,9 +344,6 @@ public class App {
         }
     }
 
-    // =========================================================================
-    // FUNCIONES DEL MENU RECEPCIONISTA
-    // =========================================================================
 
     private static void registrarPaciente() {
         System.out.println("\n--- Registrar Paciente ---");
@@ -393,8 +381,8 @@ public class App {
         System.out.println("\n--- Modificar Paciente ---");
         String dni = solicitarNumeroNoVacio("DNI del paciente: ", "DNI");
 
-        Optional<Paciente> pacienteOpt = gestorPacientes.buscarPorDni(dni);
-        if (pacienteOpt.isEmpty()) {
+        Optional<Paciente> pacienteBuscado = gestorPacientes.buscarPorDni(dni);
+        if (pacienteBuscado.isEmpty()) {
             System.out.println("Error: no existe un paciente con ese DNI.");
             return;
         }
@@ -410,21 +398,20 @@ public class App {
             return;
         }
 
-        Paciente actualizado = gestorPacientes.buscarPorDni(dni).orElse(pacienteOpt.get());
-        System.out.println("Paciente modificado correctamente.");
+        Paciente actualizado = gestorPacientes.buscarPorDni(dni).orElse(pacienteBuscado.get());
+        System.out.println("Datos del paciente actualizados.");
         mostrarResumenPaciente(actualizado);
     }
 
     private static void buscarPacientePorDni() {
         System.out.println("\n--- Buscar Paciente por DNI ---");
         String dni = solicitarNumeroNoVacio("DNI a buscar: ", "DNI");
-        Optional<Paciente> pacienteOpt = gestorPacientes.buscarPorDni(dni);
-
-        if (pacienteOpt.isEmpty()) {
+        Optional<Paciente> pacienteBuscado = gestorPacientes.buscarPorDni(dni);
+        if (pacienteBuscado.isEmpty()) {
             System.out.println("No se encontro paciente con ese DNI.");
             return;
         }
-        mostrarResumenPaciente(pacienteOpt.get());
+        mostrarResumenPaciente(pacienteBuscado.get());
     }
 
     private static void buscarPacientePorNombre() {
@@ -438,8 +425,8 @@ public class App {
         }
 
         System.out.println("Resultados:");
-        for (Paciente p : resultados) {
-            System.out.println("- " + p.getDni() + " | " + p.nombreCompleto() + " | Obra social: " + p.getObraSocial());
+        for (Paciente paciente : resultados) {
+            System.out.println("- " + paciente.getDni() + " | " + paciente.nombreCompleto() + " | Obra social: " + paciente.getObraSocial());
         }
     }
 
@@ -463,21 +450,17 @@ public class App {
         if (fechaHora == null) {
             return;
         }
-        if (fechaHora.isBefore(LocalDateTime.now())) {
-            System.out.println("Error: no se puede crear un turno en una fecha/hora anterior a la actual.");
-            return;
-        }
 
-        Optional<Turno> turnoOpt = gestorTurnos.crearTurno(dni, matricula, fechaHora, esSobreturno);
-        if (turnoOpt.isEmpty()) {
+        Optional<Turno> turnoCreado = gestorTurnos.crearTurno(dni, matricula, fechaHora, esSobreturno);
+        if (turnoCreado.isEmpty()) {
             System.out.println("Error: no se pudo crear el " + tipoTurno.toLowerCase()
-                + ". Verifique disponibilidad o fecha/hora.");
+                + ". Revise la disponibilidad y la fecha/hora ingresada.");
             return;
         }
 
-        Turno turno = turnoOpt.get();
-        System.out.println(tipoTurno + " creado correctamente.");
-        System.out.println("Resumen guardado:");
+        Turno turno = turnoCreado.get();
+        System.out.println(tipoTurno + " registrado en agenda.");
+        System.out.println("Detalle:");
         System.out.println("- ID: " + turno.getId());
         System.out.println("- Paciente DNI: " + turno.getDniPaciente());
         System.out.println("- Medico matricula: " + turno.getMatriculaMedico());
@@ -493,19 +476,19 @@ public class App {
             System.out.println("Error: no se pudo cancelar. Verifique ID y estado del turno.");
             return;
         }
-        System.out.println("Turno cancelado correctamente.");
+        System.out.println("Turno cancelado.");
     }
 
     private static void reprogramarTurno() {
         System.out.println("\n--- Reprogramar Turno ---");
         String turnoId = solicitarTextoObligatorio("ID del turno: ");
-        Optional<Turno> turnoOpt = gestorTurnos.buscarTurno(turnoId);
-        if (turnoOpt.isEmpty()) {
+        Optional<Turno> turnoBuscado = gestorTurnos.buscarTurno(turnoId);
+        if (turnoBuscado.isEmpty()) {
             System.out.println("Error: no existe un turno con ese ID.");
             return;
         }
 
-        Turno turnoActual = turnoOpt.get();
+        Turno turnoActual = turnoBuscado.get();
         String matriculaValidacion = turnoActual.isSobreturno() ? null : turnoActual.getMatriculaMedico();
         LocalDateTime nuevaFechaHora = solicitarFechaHoraTurnoValida(matriculaValidacion);
         if (nuevaFechaHora == null) {
@@ -518,7 +501,7 @@ public class App {
             return;
         }
 
-        System.out.println("Turno reprogramado correctamente.");
+        System.out.println("Turno reprogramado.");
         System.out.println("Nueva fecha/hora: " + nuevaFechaHora.format(FORMATO_FECHA_HORA));
     }
 
@@ -535,9 +518,9 @@ public class App {
         List<Disponibilidad> disponibilidades = gestorMedicos.consultarDisponibilidad(matricula);
 
         List<Disponibilidad> delDia = new ArrayList<>();
-        for (Disponibilidad d : disponibilidades) {
-            if (d.getDia().equals(dia)) {
-                delDia.add(d);
+        for (Disponibilidad disponibilidad : disponibilidades) {
+            if (disponibilidad.getDia().equals(dia)) {
+                delDia.add(disponibilidad);
             }
         }
 
@@ -547,14 +530,11 @@ public class App {
         }
 
         System.out.println("Disponibilidad del medico " + matricula + " para " + fecha.format(FORMATO_FECHA) + ":");
-        for (Disponibilidad d : delDia) {
-            System.out.println("- " + d.getHoraInicio().format(FORMATO_HORA) + " a " + d.getHoraFin().format(FORMATO_HORA));
+        for (Disponibilidad franja : delDia) {
+            System.out.println("- " + franja.getHoraInicio().format(FORMATO_HORA) + " a " + franja.getHoraFin().format(FORMATO_HORA));
         }
     }
 
-    // =========================================================================
-    // FUNCIONES DEL MENU MEDICO
-    // =========================================================================
 
     private static void consultarTurnosMedico() {
         System.out.println("\n--- Consultar Turnos del Medico ---");
@@ -593,9 +573,9 @@ public class App {
         }
 
         System.out.println("Historial de paciente " + dni + ":");
-        for (EntradaHistorial e : entradas) {
-            System.out.println("- " + e.getFecha().format(FORMATO_FECHA_HORA) + " | " + e.getResumen()
-                + " | Dx: " + e.getDiagnostico() + " | Estudios: " + e.getEstudios());
+        for (EntradaHistorial entrada : entradas) {
+            System.out.println("- " + entrada.getFecha().format(FORMATO_FECHA_HORA) + " | " + entrada.getResumen()
+                + " | Dx: " + entrada.getDiagnostico() + " | Estudios: " + entrada.getEstudios());
         }
     }
 
@@ -618,7 +598,7 @@ public class App {
             return;
         }
 
-        System.out.println("Consulta registrada correctamente para paciente DNI " + dni + ".");
+        System.out.println("Consulta cargada para paciente DNI " + dni + ".");
     }
 
     private static void actualizarDiagnostico() {
@@ -630,7 +610,7 @@ public class App {
             System.out.println("Error: no hay historial o no hay entradas para actualizar.");
             return;
         }
-        System.out.println("Diagnostico actualizado correctamente.");
+        System.out.println("Diagnostico actualizado.");
     }
 
     private static void registrarEstudio() {
@@ -642,7 +622,7 @@ public class App {
             System.out.println("Error: no hay historial o no hay entradas para actualizar.");
             return;
         }
-        System.out.println("Estudio actualizado correctamente.");
+        System.out.println("Estudio actualizado.");
     }
 
     private static void marcarTurnoAtendido() {
@@ -653,7 +633,7 @@ public class App {
             System.out.println("Error: no se pudo marcar el turno. Verifique el ID.");
             return;
         }
-        System.out.println("Turno marcado como atendido.");
+        System.out.println("Atencion registrada para el turno.");
     }
 
     private static void cancelarJornada() {
@@ -680,9 +660,6 @@ public class App {
         System.out.println("Notificaciones marcadas como leidas.");
     }
 
-    // =========================================================================
-    // FUNCIONES DEL MENU ADMINISTRADOR
-    // =========================================================================
 
     private static void registrarMedico() {
         System.out.println("\n--- Registrar Medico ---");
@@ -710,7 +687,7 @@ public class App {
         }
 
         persistencia.guardarMedicos(gestorMedicos.listarTodos());
-        System.out.println("Medico registrado correctamente.");
+        System.out.println("Medico dado de alta.");
     }
 
     private static void agregarDisponibilidad() {
@@ -731,7 +708,7 @@ public class App {
             System.out.println("Error: no se pudo agregar disponibilidad (medico inexistente o solapamiento).");
             return;
         }
-        System.out.println("Disponibilidad agregada correctamente.");
+        System.out.println("Horario agregado.");
     }
 
     private static void reemplazarDisponibilidadSimple() {
@@ -753,7 +730,7 @@ public class App {
             System.out.println("Error: no se pudo reemplazar disponibilidad (medico inexistente).");
             return;
         }
-        System.out.println("Disponibilidad reemplazada correctamente.");
+        System.out.println("Nueva disponibilidad guardada.");
     }
 
     private static void registrarEmpleado() {
@@ -771,8 +748,8 @@ public class App {
             System.out.println("Error: no se pudo registrar empleado.");
             return;
         }
-        System.out.println("Empleado registrado correctamente.");
-        System.out.println("Resumen guardado:");
+        System.out.println("Empleado registrado.");
+        System.out.println("Datos:");
         System.out.println("- Legajo: " + legajo);
         System.out.println("- Nombre: " + nombre);
         System.out.println("- Rol: " + rol);
@@ -790,7 +767,7 @@ public class App {
             return;
         }
 
-        System.out.println("Consulta SQL (simulada):");
+        System.out.println("Consulta utilizada:");
         System.out.println(persistencia.obtenerConsultaAgendaConsolidada());
         System.out.println("Fecha/Hora | Paciente | Medico | Estado | Sobreturno");
         for (Persistencia.AgendaConsolidadaFila fila : filas) {
@@ -826,14 +803,11 @@ public class App {
         String matricula = matriculaOpt.get();
         long cantidadSobreturnos = gestorTurnos.contarSobreturnosPorMedico(matricula);
         String nombreMedico = gestorMedicos.buscarMedico(matricula)
-            .map(m -> m.getNombre() + " " + m.getApellido())
+            .map(medico -> medico.getNombre() + " " + medico.getApellido())
             .orElse("Matricula " + matricula);
         System.out.println("Medico con mas sobreturnos: " + nombreMedico + " (" + cantidadSobreturnos + ")");
     }
 
-    // =========================================================================
-    // METODOS AUXILIARES
-    // =========================================================================
 
     private static String solicitarTextoObligatorio(String etiqueta) {
         while (true) {
@@ -887,7 +861,7 @@ public class App {
             LocalDateTime fechaHora = LocalDateTime.of(fecha, hora);
 
             if (fechaHora.isBefore(LocalDateTime.now())) {
-                System.out.println("Error: la fecha/hora no puede ser anterior a la actual.");
+                System.out.println("Error: la fecha y hora deben ser posteriores al momento actual.");
                 continue;
             }
 
@@ -955,7 +929,7 @@ public class App {
 
     private static boolean confirmarDatos() {
         while (true) {
-            System.out.print("Son estos datos correctos? (S/N): ");
+            System.out.print("Confirma los datos? (S/N): ");
             String respuesta = scanner.nextLine().trim().toUpperCase();
             if ("S".equals(respuesta)) {
                 return true;
@@ -971,7 +945,7 @@ public class App {
         LocalTime now = LocalTime.now();
         boolean horarioLaboral = !now.isBefore(HORA_INICIO_LABORAL) && !now.isAfter(HORA_FIN_LABORAL);
         if (!horarioLaboral) {
-            System.out.println("[INFO] Fuera de horario laboral (08:00-20:00).");
+            System.out.println("Aviso: fuera del horario laboral (08:00-20:00).");
         }
     }
 }

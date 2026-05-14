@@ -28,39 +28,20 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Persistencia - se encarga de guardar y cargar los datos en archivos .txt.
- * 
- * Implementación de persistencia en archivos de texto planos.
- * Cada entidad se guarda en su propio archivo para mantener el formato simple y explícito.
- * 
- * Archivos que usamos:
- * - pacientes_data.txt
- * - medicos_data.txt
- * - turnos_data.txt
- * - historiales_data.txt
- * - disponibilidades_data.txt
- * - empleados_data.txt
- * - notificaciones_data.txt
- * 
- */
+
 public class Persistencia {
-    
-    // Ruta base donde guardamos los archivos
+
     private final Path rutaBase;
-    
-    // Formatos para fechas y horas - los usamos para parsear y formatear
+
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
     private static final DateTimeFormatter DATETIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-    
+
     public Persistencia(Path rutaBase) {
         this.rutaBase = rutaBase;
     }
 
-    /**
-     * Representa una fila resultado de la agenda consolidada (simulación SQL).
-     */
+
     public static class AgendaConsolidadaFila {
         private final LocalDateTime fechaHora;
         private final String nombrePaciente;
@@ -103,9 +84,7 @@ public class Persistencia {
         }
     }
 
-    /**
-     * Devuelve una consulta SQL representativa para la agenda consolidada.
-     */
+
     public String obtenerConsultaAgendaConsolidada() {
         return "SELECT t.FechaHora, p.Nombre || ' ' || p.Apellido AS Paciente, "
             + "m.Nombre || ' ' || m.Apellido AS Medico, t.Estado, t.Sobreturno "
@@ -115,10 +94,7 @@ public class Persistencia {
             + "ORDER BY t.FechaHora";
     }
 
-    /**
-     * Simula un SELECT con INNER JOIN entre Turno, Paciente y Medico.
-     * Solo devuelve filas con coincidencias en las tres fuentes.
-     */
+
     public List<AgendaConsolidadaFila> consultarAgendaConsolidadaInnerJoin(
         List<Turno> turnos,
         List<Paciente> pacientes,
@@ -139,7 +115,7 @@ public class Persistencia {
             Paciente paciente = pacientePorDni.get(turno.getDniPaciente());
             Medico medico = medicoPorMatricula.get(turno.getMatriculaMedico());
             if (paciente == null || medico == null) {
-                continue; // INNER JOIN: si falta una relación, no hay fila.
+                continue;
             }
 
             filas.add(new AgendaConsolidadaFila(
@@ -154,56 +130,46 @@ public class Persistencia {
         filas.sort(Comparator.comparing(AgendaConsolidadaFila::getFechaHora));
         return filas;
     }
-    
-    // =========================================================================
-    // MÉTODOS DE GUARDADO
-    // =========================================================================
-    
-    /**
-     * Guarda todos los pacientes en el archivo pacientes_data.txt
-     */
+
+
+
     public void guardarPacientes(List<Paciente> pacientes) {
         String archivo = rutaBase.resolve("pacientes_data.txt").toString();
-        
+
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(archivo))) {
-            // Primera línea con los nombres de las columnas (como header)
             writer.write("DNI|Nombre|Apellido|Telefono|ObraSocial");
             writer.newLine();
-            
-            for (Paciente p : pacientes) {
-                // Usamos | como separador porque es fácil de leer
+
+            for (Paciente paciente : pacientes) {
                 String linea = String.join("|",
-                    p.getDni(),
-                    p.getNombre(),
-                    p.getApellido(),
-                    p.getTelefono(),
-                    p.getObraSocial()
+                    paciente.getDni(),
+                    paciente.getNombre(),
+                    paciente.getApellido(),
+                    paciente.getTelefono(),
+                    paciente.getObraSocial()
                 );
                 writer.write(linea);
                 writer.newLine();
             }
         } catch (IOException e) {
             System.out.println("Error al guardar pacientes: " + e.getMessage());
-            // TODO: Manejar mejor el error, quizás loguearlo en un archivo aparte
         }
     }
-    
-    /**
-     * Guarda todos los médicos en medicos_data.txt
-     */
+
+
     public void guardarMedicos(List<Medico> medicos) {
         String archivo = rutaBase.resolve("medicos_data.txt").toString();
-        
+
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(archivo))) {
             writer.write("Matricula|Nombre|Apellido|Especialidad");
             writer.newLine();
-            
-            for (Medico m : medicos) {
+
+            for (Medico medico : medicos) {
                 String linea = String.join("|",
-                    m.getMatricula(),
-                    m.getNombre(),
-                    m.getApellido(),
-                    m.getEspecialidad()
+                    medico.getMatricula(),
+                    medico.getNombre(),
+                    medico.getApellido(),
+                    medico.getEspecialidad()
                 );
                 writer.write(linea);
                 writer.newLine();
@@ -212,23 +178,21 @@ public class Persistencia {
             System.out.println("Error al guardar medicos: " + e.getMessage());
         }
     }
-    
-    /**
-     * Guarda las disponibilidades de los médicos
-     */
+
+
     public void guardarDisponibilidades(Map<String, List<Disponibilidad>> disponibilidades) {
         String archivo = rutaBase.resolve("disponibilidades_data.txt").toString();
-        
+
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(archivo))) {
             writer.write("Matricula|Dia|HoraInicio|HoraFin");
             writer.newLine();
-            
+
             for (Map.Entry<String, List<Disponibilidad>> entry : disponibilidades.entrySet()) {
                 String matricula = entry.getKey();
                 for (Disponibilidad disp : entry.getValue()) {
                     String linea = String.join("|",
                         matricula,
-                        String.valueOf(disp.getDia().getValue()),  // 1=Lunes, 7=Domingo
+                        String.valueOf(disp.getDia().getValue()),
                         disp.getHoraInicio().format(TIME_FORMAT),
                         disp.getHoraFin().format(TIME_FORMAT)
                     );
@@ -240,17 +204,15 @@ public class Persistencia {
             System.out.println("Error al guardar disponibilidades: " + e.getMessage());
         }
     }
-    
-    /**
-     * Guarda todos los turnos en turnos_data.txt
-     */
+
+
     public void guardarTurnos(List<Turno> turnos) {
         String archivo = rutaBase.resolve("turnos_data.txt").toString();
-        
+
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(archivo))) {
             writer.write("ID|DniPaciente|MatriculaMedico|FechaHora|Estado|Sobreturno");
             writer.newLine();
-            
+
             for (Turno t : turnos) {
                 String linea = String.join("|",
                     t.getId(),
@@ -267,27 +229,24 @@ public class Persistencia {
             System.out.println("Error al guardar turnos: " + e.getMessage());
         }
     }
-    
-    /**
-     * Guarda los historiales clínicos
-     */
+
+
     public void guardarHistoriales(List<HistorialClinico> historiales) {
         String archivo = rutaBase.resolve("historiales_data.txt").toString();
-        
+
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(archivo))) {
             writer.write("DniPaciente|Fecha|Resumen|Diagnostico|Estudios");
             writer.newLine();
-            
+
             for (HistorialClinico historial : historiales) {
                 String dniPaciente = historial.getDniPaciente();
-                
-                // Si el historial está vacío, igual lo guardamos con una línea vacía
+
                 if (historial.getEntradas().isEmpty()) {
                     writer.write(dniPaciente + "||||");
                     writer.newLine();
                     continue;
                 }
-                
+
                 for (EntradaHistorial entrada : historial.getEntradas()) {
                     String linea = String.join("|",
                         dniPaciente,
@@ -304,17 +263,15 @@ public class Persistencia {
             System.out.println("Error al guardar historiales: " + e.getMessage());
         }
     }
-    
-    /**
-     * Guarda los empleados
-     */
+
+
     public void guardarEmpleados(List<Empleado> empleados) {
         String archivo = rutaBase.resolve("empleados_data.txt").toString();
-        
+
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(archivo))) {
             writer.write("Legajo|Nombre|Rol");
             writer.newLine();
-            
+
             for (Empleado e : empleados) {
                 String linea = String.join("|",
                     e.getLegajo(),
@@ -328,17 +285,15 @@ public class Persistencia {
             System.out.println("Error al guardar empleados: " + e.getMessage());
         }
     }
-    
-    /**
-     * Guarda las notificaciones de los médicos
-     */
+
+
     public void guardarNotificaciones(Map<String, List<String>> notificaciones) {
         String archivo = rutaBase.resolve("notificaciones_data.txt").toString();
-        
+
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(archivo))) {
             writer.write("Matricula|Mensaje");
             writer.newLine();
-            
+
             for (Map.Entry<String, List<String>> entry : notificaciones.entrySet()) {
                 String matricula = entry.getKey();
                 for (String mensaje : entry.getValue()) {
@@ -350,85 +305,76 @@ public class Persistencia {
             System.out.println("Error al guardar notificaciones: " + e.getMessage());
         }
     }
-    
-    // =========================================================================
-    // MÉTODOS DE CARGA
-    // =========================================================================
-    
-    /**
-     * Carga los pacientes desde el archivo
-     */
+
+
+
     public List<Paciente> cargarPacientes() {
         List<Paciente> pacientes = new ArrayList<>();
         String archivo = rutaBase.resolve("pacientes_data.txt").toString();
-        
+
         try (BufferedReader reader = new BufferedReader(new FileReader(archivo))) {
-            String linea = reader.readLine();  // Saltamos el header
-            
+            String linea = reader.readLine();
+
             while ((linea = reader.readLine()) != null) {
                 if (linea.trim().isEmpty()) continue;
-                
+
                 String[] partes = linea.split("\\|");
                 if (partes.length >= 5) {
                     pacientes.add(new Paciente(
-                        partes[0],  // DNI
-                        partes[1],  // Nombre
-                        partes[2],  // Apellido
-                        partes[3],  // Teléfono
-                        partes[4]   // Obra social
+                        partes[0],
+                        partes[1],
+                        partes[2],
+                        partes[3],
+                        partes[4]
                     ));
                 }
             }
         } catch (IOException e) {
             System.out.println("No se pudo cargar pacientes (quizás el archivo no existe): " + e.getMessage());
         }
-        
+
         return pacientes;
     }
-    
-    /**
-     * Carga los médicos desde el archivo
-     */
+
+
     public List<Medico> cargarMedicos() {
         List<Medico> medicos = new ArrayList<>();
         String archivo = rutaBase.resolve("medicos_data.txt").toString();
-        
+
         try (BufferedReader reader = new BufferedReader(new FileReader(archivo))) {
-            String linea = reader.readLine();  // Saltamos el header
-            
+            String linea = reader.readLine();
+
             while ((linea = reader.readLine()) != null) {
                 if (linea.trim().isEmpty()) continue;
-                
+
                 String[] partes = linea.split("\\|");
                 if (partes.length >= 4) {
                     medicos.add(new Medico(
-                        partes[0],  // Matrícula
-                        partes[1],  // Nombre
-                        partes[2],  // Apellido
-                        partes[3]   // Especialidad
+                        partes[0],
+                        partes[1],
+                        partes[2],
+                        partes[3]
                     ));
                 }
             }
         } catch (IOException e) {
             System.out.println("No se pudo cargar medicos: " + e.getMessage());
         }
-        
+
         return medicos;
     }
-    
-    /**
-     * Carga las disponibilidades desde el archivo
-     */
+
+
     public Map<String, List<Disponibilidad>> cargarDisponibilidades() {
         Map<String, List<Disponibilidad>> disponibilidades = new HashMap<>();
         String archivo = rutaBase.resolve("disponibilidades_data.txt").toString();
-        
+
         try (BufferedReader reader = new BufferedReader(new FileReader(archivo))) {
-            String linea = reader.readLine();  // Saltamos el header
-            
+            String linea = reader.readLine();
+
             while ((linea = reader.readLine()) != null) {
                 if (linea.trim().isEmpty()) continue;
-                
+
                 String[] partes = linea.split("\\|");
                 if (partes.length >= 4) {
                     try {
@@ -436,7 +382,7 @@ public class Persistencia {
                         int diaNum = Integer.parseInt(partes[1]);
                         LocalTime inicio = LocalTime.parse(partes[2], TIME_FORMAT);
                         LocalTime fin = LocalTime.parse(partes[3], TIME_FORMAT);
-                        
+
                         Disponibilidad disp = new Disponibilidad(DayOfWeek.of(diaNum), inicio, fin);
                         disponibilidades.computeIfAbsent(matricula, k -> new ArrayList<>()).add(disp);
                     } catch (NumberFormatException | DateTimeParseException e) {
@@ -447,72 +393,66 @@ public class Persistencia {
         } catch (IOException e) {
             System.out.println("No se pudo cargar disponibilidades: " + e.getMessage());
         }
-        
+
         return disponibilidades;
     }
-    
-    /**
-     * Carga los turnos desde el archivo
-     */
+
+
     public List<Turno> cargarTurnos() {
         List<Turno> turnos = new ArrayList<>();
         String archivo = rutaBase.resolve("turnos_data.txt").toString();
-        
+
         try (BufferedReader reader = new BufferedReader(new FileReader(archivo))) {
-            String linea = reader.readLine();  // Saltamos el header
-            
+            String linea = reader.readLine();
+
             while ((linea = reader.readLine()) != null) {
                 if (linea.trim().isEmpty()) continue;
-                
+
                 String[] partes = linea.split("\\|");
                 if (partes.length >= 6) {
                     turnos.add(new Turno(
-                        partes[0],  // ID
-                        partes[1],  // DNI paciente
-                        partes[2],  // Matrícula médico
+                        partes[0],
+                        partes[1],
+                        partes[2],
                         LocalDateTime.parse(partes[3], DATETIME_FORMAT),
-                        Boolean.parseBoolean(partes[5]),  // Sobreturno
-                        EstadoTurno.valueOf(partes[4])    // Estado
+                        Boolean.parseBoolean(partes[5]),
+                        EstadoTurno.valueOf(partes[4])
                     ));
                 }
             }
         } catch (IOException e) {
             System.out.println("No se pudo cargar turnos: " + e.getMessage());
         }
-        
+
         return turnos;
     }
-    
-    /**
-     * Carga los historiales clínicos desde el archivo
-     */
+
+
     public List<HistorialClinico> cargarHistoriales() {
         List<HistorialClinico> historiales = new ArrayList<>();
         Map<String, HistorialClinico> mapaHistoriales = new HashMap<>();
         String archivo = rutaBase.resolve("historiales_data.txt").toString();
-        
+
         try (BufferedReader reader = new BufferedReader(new FileReader(archivo))) {
-            String linea = reader.readLine();  // Saltamos el header
-            
+            String linea = reader.readLine();
+
             while ((linea = reader.readLine()) != null) {
                 if (linea.trim().isEmpty()) continue;
-                
+
                 String[] partes = linea.split("\\|");
                 if (partes.length >= 2) {
                     String dniPaciente = partes[0];
-                    
-                    // Creamos el historial si no existe
+
                     HistorialClinico historial = mapaHistoriales.computeIfAbsent(
                         dniPaciente, k -> new HistorialClinico(k)
                     );
-                    
-                    // Si hay datos de entrada, los agregamos
+
                     if (partes.length >= 5 && !partes[1].isEmpty()) {
                         EntradaHistorial entrada = new EntradaHistorial(
                             LocalDateTime.parse(partes[1], DATETIME_FORMAT),
-                            partes[2],  // Resumen
-                            partes[3],  // Diagnóstico
-                            partes[4]   // Estudios
+                            partes[2],
+                            partes[3],
+                            partes[4]
                         );
                         historial.agregarEntrada(entrada);
                     }
@@ -521,54 +461,50 @@ public class Persistencia {
         } catch (IOException e) {
             System.out.println("No se pudo cargar historiales: " + e.getMessage());
         }
-        
+
         historiales.addAll(mapaHistoriales.values());
         return historiales;
     }
-    
-    /**
-     * Carga los empleados desde el archivo
-     */
+
+
     public List<Empleado> cargarEmpleados() {
         List<Empleado> empleados = new ArrayList<>();
         String archivo = rutaBase.resolve("empleados_data.txt").toString();
-        
+
         try (BufferedReader reader = new BufferedReader(new FileReader(archivo))) {
-            String linea = reader.readLine();  // Saltamos el header
-            
+            String linea = reader.readLine();
+
             while ((linea = reader.readLine()) != null) {
                 if (linea.trim().isEmpty()) continue;
-                
+
                 String[] partes = linea.split("\\|");
                 if (partes.length >= 3) {
                     empleados.add(new Empleado(
-                        partes[0],  // Legajo
-                        partes[1],  // Nombre
-                        RolUsuario.valueOf(partes[2])  // Rol
+                        partes[0],
+                        partes[1],
+                        RolUsuario.valueOf(partes[2])
                     ));
                 }
             }
         } catch (IOException e) {
             System.out.println("No se pudo cargar empleados: " + e.getMessage());
         }
-        
+
         return empleados;
     }
-    
-    /**
-     * Carga las notificaciones desde el archivo
-     */
+
+
     public Map<String, List<String>> cargarNotificaciones() {
         Map<String, List<String>> notificaciones = new HashMap<>();
         String archivo = rutaBase.resolve("notificaciones_data.txt").toString();
-        
+
         try (BufferedReader reader = new BufferedReader(new FileReader(archivo))) {
-            String linea = reader.readLine();  // Saltamos el header
-            
+            String linea = reader.readLine();
+
             while ((linea = reader.readLine()) != null) {
                 if (linea.trim().isEmpty()) continue;
-                
-                String[] partes = linea.split("\\|", 2);  // Split en 2 partes máximo
+
+                String[] partes = linea.split("\\|", 2);
                 if (partes.length >= 2) {
                     String matricula = partes[0];
                     String mensaje = partes[1];
@@ -578,7 +514,7 @@ public class Persistencia {
         } catch (IOException e) {
             System.out.println("No se pudo cargar notificaciones: " + e.getMessage());
         }
-        
+
         return notificaciones;
     }
 }
