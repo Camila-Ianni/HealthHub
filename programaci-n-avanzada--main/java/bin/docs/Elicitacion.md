@@ -77,7 +77,7 @@ Después de hablar con ellos, estas son las reglas que tenemos que respetar:
 - No tienen presupuesto para comprar licencias de bases de datos
 - Quieren algo simple, que puedan aprender a usar en un día
 
-**Nuestra decisión:** Vamos a usar una base de datos H2 embebida para guardar los datos. Así la aplicación persiste la información de forma real sin requerir un servidor externo.
+**Nuestra decisión:** Vamos a usar archivos de texto (.txt) para guardar los datos. Así no hace falta instalar nada y es fácil de probar. Después, si quieren, se puede pasar a una base de datos real.
 
 ## Cosas que no vamos a hacer (por ahora)
 

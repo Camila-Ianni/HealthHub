@@ -1,48 +1,58 @@
 erDiagram
-    USUARIO {
-        string id PK
+    %% Base de datos H2 embebida
+    EMPLEADO {
+        string legajo PK
         string nombre
-        string apellido
-        string telefono
         string rol
     }
 
     PACIENTE {
         string dni PK
+        string nombre
+        string apellido
+        string telefono
         string obraSocial
     }
 
     MEDICO {
         string matricula PK
+        string nombre
+        string apellido
         string especialidad
     }
 
     DISPONIBILIDAD {
-        string id PK
-        string diaSemana
+        string matricula FK
+        string dia
         string horaInicio
         string horaFin
     }
 
     TURNO {
         string id PK
+        string dniPaciente FK
+        string matriculaMedico FK
         datetime fechaHora
         string estado
         boolean sobreturno
     }
 
     HISTORIAL_CLINICO {
-        string id PK
-        string pacienteDni FK
-        datetime fechaCreacion
+        string dniPaciente PK, FK
     }
 
     ENTRADA_HISTORIAL {
         string id PK
+        string dniPaciente FK
         datetime fecha
-        string resumenConsulta
+        string resumen
         string diagnostico
         string estudios
+    }
+
+    NOTIFICACION {
+        string legajo FK
+        string mensaje
     }
 
     PACIENTE ||--|| HISTORIAL_CLINICO : posee
@@ -50,3 +60,4 @@ erDiagram
     MEDICO ||--o{ DISPONIBILIDAD : define
     PACIENTE ||--o{ TURNO : solicita
     MEDICO ||--o{ TURNO : atiende
+    EMPLEADO ||--o{ NOTIFICACION : recibe

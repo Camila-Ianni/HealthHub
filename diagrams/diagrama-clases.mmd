@@ -1,61 +1,130 @@
 classDiagram
-    class Usuario {
-      -String id
+    class App {
+      +main(String[])
+    }
+
+    class VentanaLogin {
+      -HealthHubContext contexto
+      -JTextField campoLegajo
+      +main(String[])
+    }
+
+    class VentanaPrincipal {
+      -HealthHubContext contexto
+      -Empleado empleado
+    }
+
+    class VentanaGestionGeneral {
+      -HealthHubContext contexto
+      -String pestañaInicial
+    }
+
+    class VentanaAgenda
+    class VentanaEstadisticas
+    class HealthHubIcons
+    class HealthHubSwing
+    class HealthHubContext
+
+    class GestorPacientes {
+      +registrarPaciente(Paciente)
+      +modificarPaciente(String, String, String, String, String)
+      +buscarPorDni(String)
+      +buscarPorNombreCompleto(String)
+      +listarTodos()
+    }
+
+    class GestorMedicos {
+      +registrarMedico(Medico)
+      +agregarDisponibilidad(String, Disponibilidad)
+      +consultarDisponibilidad(String)
+      +buscarMedico(String)
+      +listarTodos()
+    }
+
+    class GestorTurnos {
+      +crearTurno(String, String, LocalDateTime, boolean)
+      +cancelarTurno(String)
+      +reprogramarTurno(String, LocalDateTime)
+      +marcarAtendido(String)
+      +listarTodos()
+    }
+
+    class GestorHistoriales {
+      +crearHistorialSiNoExiste(String)
+      +registrarConsulta(RolUsuario, String, String, String, String)
+      +actualizarDiagnostico(String, String)
+      +actualizarEstudios(String, String)
+      +verHistorial(String)
+    }
+
+    class GestorEmpleados {
+      +registrarEmpleado(String, String, RolUsuario)
+      +buscarPorLegajo(String)
+      +listarTodos()
+    }
+
+    class GestorNotificaciones {
+      +agregarNotificacion(String, String)
+      +verNotificaciones(String)
+      +limpiarNotificaciones(String)
+      +listarTodas()
+    }
+
+    class Persistencia {
+      +guardarPacientes(List~Paciente~)
+      +guardarMedicos(List~Medico~)
+      +guardarTurnos(List~Turno~)
+      +guardarHistoriales(List~HistorialClinico~)
+      +guardarEmpleados(List~Empleado~)
+      +guardarNotificaciones(Map~String, List~String~~)
+      +cargarPacientes()
+      +cargarMedicos()
+      +cargarTurnos()
+      +cargarHistoriales()
+      +cargarEmpleados()
+      +cargarNotificaciones()
+    }
+
+    %% Persistencia JDBC/H2
+
+    class Empleado {
+      -String legajo
       -String nombre
-      -String apellido
-      -String telefono
-      +mostrarMenu()
-    }
-
-    class Recepcionista {
-      +registrarPaciente()
-      +buscarPaciente()
-      +crearTurno()
-      +reprogramarTurno()
-      +cancelarTurno()
-    }
-
-    class Medico {
-      -String matricula
-      -String especialidad
-      +visualizarTurnos()
-      +marcarTurnoAtendido()
-      +visualizarHistorial()
-      +actualizarHistorial()
-      +cancelarJornada()
-    }
-
-    class Administrador {
-      +registrarMedico()
-      +gestionarDisponibilidad()
-      +registrarEmpleado()
+      -RolUsuario rol
     }
 
     class Paciente {
       -String dni
+      -String nombre
+      -String apellido
+      -String telefono
       -String obraSocial
+    }
+
+    class Medico {
+      -String matricula
+      -String nombre
+      -String apellido
+      -String especialidad
     }
 
     class Turno {
       -String id
+      -String dniPaciente
+      -String matriculaMedico
       -LocalDateTime fechaHora
       -EstadoTurno estado
       -boolean sobreturno
-      +cancelar()
-      +reprogramar()
-      +marcarAtendido()
     }
 
     class HistorialClinico {
-      -String id
+      -String dniPaciente
       -List~EntradaHistorial~ entradas
-      +agregarEntrada()
-      +listarEntradas()
     }
 
     class EntradaHistorial {
       -LocalDateTime fecha
-      -String resumenConsulta
+      -String resumen
       -String diagnostico
       -String estudios
     }
@@ -64,53 +133,28 @@ classDiagram
       -DayOfWeek dia
       -LocalTime horaInicio
       -LocalTime horaFin
-      +solapaCon(Disponibilidad)
     }
 
-    class PacienteService {
-      +registrar(Paciente)
-      +buscarPorDni(String)
-      +buscarPorNombre(String)
-      +modificar(Paciente)
-    }
+    App ..> VentanaLogin
+    VentanaLogin ..> HealthHubContext
+    VentanaPrincipal ..> HealthHubContext
+    VentanaGestionGeneral ..> HealthHubContext
+    VentanaPrincipal ..> VentanaAgenda
+    VentanaPrincipal ..> VentanaEstadisticas
+    VentanaPrincipal ..> VentanaGestionGeneral
+    HealthHubContext ..> GestorPacientes
+    HealthHubContext ..> GestorMedicos
+    HealthHubContext ..> GestorTurnos
+    HealthHubContext ..> GestorHistoriales
+    HealthHubContext ..> GestorEmpleados
+    HealthHubContext ..> GestorNotificaciones
+    HealthHubContext ..> Persistencia
 
-    class MedicoService {
-      +registrar(Medico)
-      +actualizarDisponibilidad()
-      +cancelarJornada()
-    }
-
-    class TurnoService {
-      +crearTurno()
-      +cancelarTurno()
-      +reprogramarTurno()
-      +validarDuplicado()
-    }
-
-    class HistorialService {
-      +crearHistorial(Paciente)
-      +registrarConsulta()
-      +actualizarDiagnostico()
-      +registrarEstudio()
-    }
-
-    class NotificationService {
-      +notificarCambioTurno()
-    }
-
-    Usuario <|-- Recepcionista
-    Usuario <|-- Medico
-    Usuario <|-- Administrador
-    Usuario <|-- Paciente
-
-    Paciente "1" --> "1" HistorialClinico : posee
-    HistorialClinico "1" --> "*" EntradaHistorial : contiene
-    Medico "1" --> "*" Disponibilidad : define
-    Medico "1" --> "*" Turno : atiende
-    Paciente "1" --> "*" Turno : solicita
-
-    Recepcionista ..> PacienteService
-    Recepcionista ..> TurnoService
-    Administrador ..> MedicoService
-    Medico ..> HistorialService
-    TurnoService ..> NotificationService
+    GestorPacientes --> Paciente
+    GestorMedicos --> Medico
+    GestorTurnos --> Turno
+    GestorHistoriales --> HistorialClinico
+    HistorialClinico --> EntradaHistorial
+    Medico --> Disponibilidad
+    Empleado --> RolUsuario
+    Turno --> EstadoTurno

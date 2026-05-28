@@ -10,54 +10,66 @@ import com.healthhub.domain.Paciente;
 import com.healthhub.domain.RolUsuario;
 import com.healthhub.domain.Turno;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Time;
+import java.sql.Timestamp;
 import java.time.DayOfWeek;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-
 public class Persistencia {
 
     private final Path rutaBase;
-
-    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-    private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
-    private static final DateTimeFormatter DATETIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private final String urlConexion;
 
     public Persistencia(Path rutaBase) {
         this.rutaBase = rutaBase;
-    }
+        this.urlConexion = "jdbc:h2:file:" + rutaBase.resolve("healthhub-db").toString().replace('\\', '/') + ";MODE=MySQL";
 
+        try {
+            Files.createDirectories(rutaBase);
+        } catch (IOException e) {
+            System.out.println("No se pudo crear la carpeta de datos: " + e.getMessage());
+        }
+
+        inicializarEsquema();
+    }
 
     public static class AgendaConsolidadaFila {
         private final LocalDateTime fechaHora;
+        private final String dniPaciente;
         private final String nombrePaciente;
+        private final String matriculaMedico;
         private final String nombreMedico;
         private final EstadoTurno estado;
         private final boolean sobreturno;
 
         public AgendaConsolidadaFila(
             LocalDateTime fechaHora,
+            String dniPaciente,
             String nombrePaciente,
+            String matriculaMedico,
             String nombreMedico,
             EstadoTurno estado,
             boolean sobreturno
         ) {
             this.fechaHora = fechaHora;
+            this.dniPaciente = dniPaciente;
             this.nombrePaciente = nombrePaciente;
+            this.matriculaMedico = matriculaMedico;
             this.nombreMedico = nombreMedico;
             this.estado = estado;
             this.sobreturno = sobreturno;
@@ -67,8 +79,16 @@ public class Persistencia {
             return fechaHora;
         }
 
+        public String getDniPaciente() {
+            return dniPaciente;
+        }
+
         public String getNombrePaciente() {
             return nombrePaciente;
+        }
+
+        public String getMatriculaMedico() {
+            return matriculaMedico;
         }
 
         public String getNombreMedico() {
@@ -84,16 +104,14 @@ public class Persistencia {
         }
     }
 
-
     public String obtenerConsultaAgendaConsolidada() {
-        return "SELECT t.FechaHora, p.Nombre || ' ' || p.Apellido AS Paciente, "
-            + "m.Nombre || ' ' || m.Apellido AS Medico, t.Estado, t.Sobreturno "
-            + "FROM Turno t "
-            + "INNER JOIN Paciente p ON p.DNI = t.DniPaciente "
-            + "INNER JOIN Medico m ON m.Matricula = t.MatriculaMedico "
-            + "ORDER BY t.FechaHora";
+        return "SELECT t.FECHA_HORA, p.NOMBRE || ' ' || p.APELLIDO AS PACIENTE, "
+            + "m.NOMBRE || ' ' || m.APELLIDO AS MEDICO, t.ESTADO, t.SOBRETURNO "
+            + "FROM TURNO t "
+            + "INNER JOIN PACIENTE p ON p.DNI = t.DNI_PACIENTE "
+            + "INNER JOIN MEDICO m ON m.MATRICULA = t.MATRICULA_MEDICO "
+            + "ORDER BY t.FECHA_HORA";
     }
-
 
     public List<AgendaConsolidadaFila> consultarAgendaConsolidadaInnerJoin(
         List<Turno> turnos,
@@ -120,7 +138,9 @@ public class Persistencia {
 
             filas.add(new AgendaConsolidadaFila(
                 turno.getFechaHora(),
+                paciente.getDni(),
                 paciente.getNombre() + " " + paciente.getApellido(),
+                medico.getMatricula(),
                 medico.getNombre() + " " + medico.getApellido(),
                 turno.getEstado(),
                 turno.isSobreturno()
@@ -131,390 +151,408 @@ public class Persistencia {
         return filas;
     }
 
-
-
     public void guardarPacientes(List<Paciente> pacientes) {
-        String archivo = rutaBase.resolve("pacientes_data.txt").toString();
-
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(archivo))) {
-            writer.write("DNI|Nombre|Apellido|Telefono|ObraSocial");
-            writer.newLine();
-
-            for (Paciente paciente : pacientes) {
-                String linea = String.join("|",
-                    paciente.getDni(),
-                    paciente.getNombre(),
-                    paciente.getApellido(),
-                    paciente.getTelefono(),
-                    paciente.getObraSocial()
-                );
-                writer.write(linea);
-                writer.newLine();
+        ejecutarTransaccion(conn -> {
+            try (Statement st = conn.createStatement()) {
+                st.executeUpdate("DELETE FROM PACIENTE");
+                try (PreparedStatement ps = conn.prepareStatement(
+                    "INSERT INTO PACIENTE (DNI, NOMBRE, APELLIDO, TELEFONO, OBRA_SOCIAL) VALUES (?, ?, ?, ?, ?)"
+                )) {
+                    for (Paciente paciente : pacientes) {
+                        ps.setString(1, paciente.getDni());
+                        ps.setString(2, paciente.getNombre());
+                        ps.setString(3, paciente.getApellido());
+                        ps.setString(4, paciente.getTelefono());
+                        ps.setString(5, paciente.getObraSocial());
+                        ps.addBatch();
+                    }
+                    ps.executeBatch();
+                }
             }
-        } catch (IOException e) {
-            System.out.println("Error al guardar pacientes: " + e.getMessage());
-        }
+        }, "Error al guardar pacientes: ");
     }
-
 
     public void guardarMedicos(List<Medico> medicos) {
-        String archivo = rutaBase.resolve("medicos_data.txt").toString();
-
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(archivo))) {
-            writer.write("Matricula|Nombre|Apellido|Especialidad");
-            writer.newLine();
-
-            for (Medico medico : medicos) {
-                String linea = String.join("|",
-                    medico.getMatricula(),
-                    medico.getNombre(),
-                    medico.getApellido(),
-                    medico.getEspecialidad()
-                );
-                writer.write(linea);
-                writer.newLine();
+        ejecutarTransaccion(conn -> {
+            try (Statement st = conn.createStatement()) {
+                st.executeUpdate("DELETE FROM MEDICO");
+                try (PreparedStatement ps = conn.prepareStatement(
+                    "INSERT INTO MEDICO (MATRICULA, NOMBRE, APELLIDO, ESPECIALIDAD) VALUES (?, ?, ?, ?)"
+                )) {
+                    for (Medico medico : medicos) {
+                        ps.setString(1, medico.getMatricula());
+                        ps.setString(2, medico.getNombre());
+                        ps.setString(3, medico.getApellido());
+                        ps.setString(4, medico.getEspecialidad());
+                        ps.addBatch();
+                    }
+                    ps.executeBatch();
+                }
             }
-        } catch (IOException e) {
-            System.out.println("Error al guardar medicos: " + e.getMessage());
-        }
+        }, "Error al guardar medicos: ");
     }
-
 
     public void guardarDisponibilidades(Map<String, List<Disponibilidad>> disponibilidades) {
-        String archivo = rutaBase.resolve("disponibilidades_data.txt").toString();
-
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(archivo))) {
-            writer.write("Matricula|Dia|HoraInicio|HoraFin");
-            writer.newLine();
-
-            for (Map.Entry<String, List<Disponibilidad>> entry : disponibilidades.entrySet()) {
-                String matricula = entry.getKey();
-                for (Disponibilidad disp : entry.getValue()) {
-                    String linea = String.join("|",
-                        matricula,
-                        String.valueOf(disp.getDia().getValue()),
-                        disp.getHoraInicio().format(TIME_FORMAT),
-                        disp.getHoraFin().format(TIME_FORMAT)
-                    );
-                    writer.write(linea);
-                    writer.newLine();
+        ejecutarTransaccion(conn -> {
+            try (Statement st = conn.createStatement()) {
+                st.executeUpdate("DELETE FROM DISPONIBILIDAD");
+                try (PreparedStatement ps = conn.prepareStatement(
+                    "INSERT INTO DISPONIBILIDAD (MATRICULA, DIA, HORA_INICIO, HORA_FIN) VALUES (?, ?, ?, ?)"
+                )) {
+                    for (Map.Entry<String, List<Disponibilidad>> entry : disponibilidades.entrySet()) {
+                        for (Disponibilidad disponibilidad : entry.getValue()) {
+                            ps.setString(1, entry.getKey());
+                            ps.setInt(2, disponibilidad.getDia().getValue());
+                            ps.setTime(3, Time.valueOf(disponibilidad.getHoraInicio()));
+                            ps.setTime(4, Time.valueOf(disponibilidad.getHoraFin()));
+                            ps.addBatch();
+                        }
+                    }
+                    ps.executeBatch();
                 }
             }
-        } catch (IOException e) {
-            System.out.println("Error al guardar disponibilidades: " + e.getMessage());
-        }
+        }, "Error al guardar disponibilidades: ");
     }
-
 
     public void guardarTurnos(List<Turno> turnos) {
-        String archivo = rutaBase.resolve("turnos_data.txt").toString();
-
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(archivo))) {
-            writer.write("ID|DniPaciente|MatriculaMedico|FechaHora|Estado|Sobreturno");
-            writer.newLine();
-
-            for (Turno t : turnos) {
-                String linea = String.join("|",
-                    t.getId(),
-                    t.getDniPaciente(),
-                    t.getMatriculaMedico(),
-                    t.getFechaHora().format(DATETIME_FORMAT),
-                    t.getEstado().name(),
-                    String.valueOf(t.isSobreturno())
-                );
-                writer.write(linea);
-                writer.newLine();
+        ejecutarTransaccion(conn -> {
+            try (Statement st = conn.createStatement()) {
+                st.executeUpdate("DELETE FROM TURNO");
+                try (PreparedStatement ps = conn.prepareStatement(
+                    "INSERT INTO TURNO (ID, DNI_PACIENTE, MATRICULA_MEDICO, FECHA_HORA, ESTADO, SOBRETURNO) VALUES (?, ?, ?, ?, ?, ?)"
+                )) {
+                    for (Turno turno : turnos) {
+                        ps.setString(1, turno.getId());
+                        ps.setString(2, turno.getDniPaciente());
+                        ps.setString(3, turno.getMatriculaMedico());
+                        ps.setTimestamp(4, Timestamp.valueOf(turno.getFechaHora()));
+                        ps.setString(5, turno.getEstado().name());
+                        ps.setBoolean(6, turno.isSobreturno());
+                        ps.addBatch();
+                    }
+                    ps.executeBatch();
+                }
             }
-        } catch (IOException e) {
-            System.out.println("Error al guardar turnos: " + e.getMessage());
-        }
+        }, "Error al guardar turnos: ");
     }
-
 
     public void guardarHistoriales(List<HistorialClinico> historiales) {
-        String archivo = rutaBase.resolve("historiales_data.txt").toString();
+        ejecutarTransaccion(conn -> {
+            try (Statement st = conn.createStatement()) {
+                st.executeUpdate("DELETE FROM HISTORIAL_CLINICO");
+                try (PreparedStatement historialPs = conn.prepareStatement(
+                    "INSERT INTO HISTORIAL_CLINICO (DNI_PACIENTE) VALUES (?)"
+                ); PreparedStatement entradaPs = conn.prepareStatement(
+                    "INSERT INTO ENTRADA_HISTORIAL (DNI_PACIENTE, FECHA, RESUMEN, DIAGNOSTICO, ESTUDIOS) VALUES (?, ?, ?, ?, ?)"
+                )) {
+                    for (HistorialClinico historial : historiales) {
+                        historialPs.setString(1, historial.getDniPaciente());
+                        historialPs.addBatch();
 
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(archivo))) {
-            writer.write("DniPaciente|Fecha|Resumen|Diagnostico|Estudios");
-            writer.newLine();
+                        for (EntradaHistorial entrada : historial.getEntradas()) {
+                            entradaPs.setString(1, historial.getDniPaciente());
+                            entradaPs.setTimestamp(2, Timestamp.valueOf(entrada.getFecha()));
+                            entradaPs.setString(3, entrada.getResumen());
+                            entradaPs.setString(4, entrada.getDiagnostico());
+                            entradaPs.setString(5, entrada.getEstudios());
+                            entradaPs.addBatch();
+                        }
+                    }
 
-            for (HistorialClinico historial : historiales) {
-                String dniPaciente = historial.getDniPaciente();
-
-                if (historial.getEntradas().isEmpty()) {
-                    writer.write(dniPaciente + "||||");
-                    writer.newLine();
-                    continue;
-                }
-
-                for (EntradaHistorial entrada : historial.getEntradas()) {
-                    String linea = String.join("|",
-                        dniPaciente,
-                        entrada.getFecha().format(DATETIME_FORMAT),
-                        entrada.getResumen(),
-                        entrada.getDiagnostico(),
-                        entrada.getEstudios() != null ? entrada.getEstudios() : ""
-                    );
-                    writer.write(linea);
-                    writer.newLine();
+                    historialPs.executeBatch();
+                    entradaPs.executeBatch();
                 }
             }
-        } catch (IOException e) {
-            System.out.println("Error al guardar historiales: " + e.getMessage());
-        }
+        }, "Error al guardar historiales: ");
     }
-
 
     public void guardarEmpleados(List<Empleado> empleados) {
-        String archivo = rutaBase.resolve("empleados_data.txt").toString();
-
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(archivo))) {
-            writer.write("Legajo|Nombre|Rol");
-            writer.newLine();
-
-            for (Empleado e : empleados) {
-                String linea = String.join("|",
-                    e.getLegajo(),
-                    e.getNombre(),
-                    e.getRol().name()
-                );
-                writer.write(linea);
-                writer.newLine();
-            }
-        } catch (IOException e) {
-            System.out.println("Error al guardar empleados: " + e.getMessage());
-        }
-    }
-
-
-    public void guardarNotificaciones(Map<String, List<String>> notificaciones) {
-        String archivo = rutaBase.resolve("notificaciones_data.txt").toString();
-
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(archivo))) {
-            writer.write("Matricula|Mensaje");
-            writer.newLine();
-
-            for (Map.Entry<String, List<String>> entry : notificaciones.entrySet()) {
-                String matricula = entry.getKey();
-                for (String mensaje : entry.getValue()) {
-                    writer.write(matricula + "|" + mensaje);
-                    writer.newLine();
+        ejecutarTransaccion(conn -> {
+            try (Statement st = conn.createStatement()) {
+                st.executeUpdate("DELETE FROM EMPLEADO");
+                try (PreparedStatement ps = conn.prepareStatement(
+                    "INSERT INTO EMPLEADO (LEGAJO, NOMBRE, ROL) VALUES (?, ?, ?)"
+                )) {
+                    for (Empleado empleado : empleados) {
+                        ps.setString(1, empleado.getLegajo());
+                        ps.setString(2, empleado.getNombre());
+                        ps.setString(3, empleado.getRol().name());
+                        ps.addBatch();
+                    }
+                    ps.executeBatch();
                 }
             }
-        } catch (IOException e) {
-            System.out.println("Error al guardar notificaciones: " + e.getMessage());
-        }
+        }, "Error al guardar empleados: ");
     }
 
-
+    public void guardarNotificaciones(Map<String, List<String>> notificaciones) {
+        ejecutarTransaccion(conn -> {
+            try (Statement st = conn.createStatement()) {
+                st.executeUpdate("DELETE FROM NOTIFICACION");
+                try (PreparedStatement ps = conn.prepareStatement(
+                    "INSERT INTO NOTIFICACION (LEGAJO, MENSAJE) VALUES (?, ?)"
+                )) {
+                    for (Map.Entry<String, List<String>> entry : notificaciones.entrySet()) {
+                        for (String mensaje : entry.getValue()) {
+                            ps.setString(1, entry.getKey());
+                            ps.setString(2, mensaje);
+                            ps.addBatch();
+                        }
+                    }
+                    ps.executeBatch();
+                }
+            }
+        }, "Error al guardar notificaciones: ");
+    }
 
     public List<Paciente> cargarPacientes() {
         List<Paciente> pacientes = new ArrayList<>();
-        String archivo = rutaBase.resolve("pacientes_data.txt").toString();
-
-        try (BufferedReader reader = new BufferedReader(new FileReader(archivo))) {
-            String linea = reader.readLine();
-
-            while ((linea = reader.readLine()) != null) {
-                if (linea.trim().isEmpty()) continue;
-
-                String[] partes = linea.split("\\|");
-                if (partes.length >= 5) {
-                    pacientes.add(new Paciente(
-                        partes[0],
-                        partes[1],
-                        partes[2],
-                        partes[3],
-                        partes[4]
-                    ));
-                }
+        try (Connection conn = conectar(); Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(
+            "SELECT DNI, NOMBRE, APELLIDO, TELEFONO, OBRA_SOCIAL FROM PACIENTE ORDER BY APELLIDO, NOMBRE"
+        )) {
+            while (rs.next()) {
+                pacientes.add(new Paciente(
+                    rs.getString("DNI"),
+                    rs.getString("NOMBRE"),
+                    rs.getString("APELLIDO"),
+                    rs.getString("TELEFONO"),
+                    rs.getString("OBRA_SOCIAL")
+                ));
             }
-        } catch (IOException e) {
-            System.out.println("No se pudo cargar pacientes (quizás el archivo no existe): " + e.getMessage());
+        } catch (SQLException e) {
+            System.out.println("Error al cargar pacientes: " + e.getMessage());
         }
-
         return pacientes;
     }
 
-
     public List<Medico> cargarMedicos() {
         List<Medico> medicos = new ArrayList<>();
-        String archivo = rutaBase.resolve("medicos_data.txt").toString();
-
-        try (BufferedReader reader = new BufferedReader(new FileReader(archivo))) {
-            String linea = reader.readLine();
-
-            while ((linea = reader.readLine()) != null) {
-                if (linea.trim().isEmpty()) continue;
-
-                String[] partes = linea.split("\\|");
-                if (partes.length >= 4) {
-                    medicos.add(new Medico(
-                        partes[0],
-                        partes[1],
-                        partes[2],
-                        partes[3]
-                    ));
-                }
+        try (Connection conn = conectar(); Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(
+            "SELECT MATRICULA, NOMBRE, APELLIDO, ESPECIALIDAD FROM MEDICO ORDER BY APELLIDO, NOMBRE"
+        )) {
+            while (rs.next()) {
+                medicos.add(new Medico(
+                    rs.getString("MATRICULA"),
+                    rs.getString("NOMBRE"),
+                    rs.getString("APELLIDO"),
+                    rs.getString("ESPECIALIDAD")
+                ));
             }
-        } catch (IOException e) {
-            System.out.println("No se pudo cargar medicos: " + e.getMessage());
+        } catch (SQLException e) {
+            System.out.println("Error al cargar medicos: " + e.getMessage());
         }
-
         return medicos;
     }
 
-
     public Map<String, List<Disponibilidad>> cargarDisponibilidades() {
         Map<String, List<Disponibilidad>> disponibilidades = new HashMap<>();
-        String archivo = rutaBase.resolve("disponibilidades_data.txt").toString();
-
-        try (BufferedReader reader = new BufferedReader(new FileReader(archivo))) {
-            String linea = reader.readLine();
-
-            while ((linea = reader.readLine()) != null) {
-                if (linea.trim().isEmpty()) continue;
-
-                String[] partes = linea.split("\\|");
-                if (partes.length >= 4) {
-                    try {
-                        String matricula = partes[0];
-                        int diaNum = Integer.parseInt(partes[1]);
-                        LocalTime inicio = LocalTime.parse(partes[2], TIME_FORMAT);
-                        LocalTime fin = LocalTime.parse(partes[3], TIME_FORMAT);
-
-                        Disponibilidad disp = new Disponibilidad(DayOfWeek.of(diaNum), inicio, fin);
-                        disponibilidades.computeIfAbsent(matricula, k -> new ArrayList<>()).add(disp);
-                    } catch (NumberFormatException | DateTimeParseException e) {
-                        System.out.println("Línea inválida en disponibilidades, se omite: " + linea);
-                    }
-                }
+        try (Connection conn = conectar(); Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(
+            "SELECT MATRICULA, DIA, HORA_INICIO, HORA_FIN FROM DISPONIBILIDAD ORDER BY MATRICULA, DIA, HORA_INICIO"
+        )) {
+            while (rs.next()) {
+                String matricula = rs.getString("MATRICULA");
+                int dia = rs.getInt("DIA");
+                LocalTime inicio = rs.getTime("HORA_INICIO").toLocalTime();
+                LocalTime fin = rs.getTime("HORA_FIN").toLocalTime();
+                disponibilidades.computeIfAbsent(matricula, k -> new ArrayList<>())
+                    .add(new Disponibilidad(DayOfWeek.of(dia), inicio, fin));
             }
-        } catch (IOException e) {
-            System.out.println("No se pudo cargar disponibilidades: " + e.getMessage());
+        } catch (SQLException e) {
+            System.out.println("Error al cargar disponibilidades: " + e.getMessage());
         }
-
         return disponibilidades;
     }
 
-
     public List<Turno> cargarTurnos() {
         List<Turno> turnos = new ArrayList<>();
-        String archivo = rutaBase.resolve("turnos_data.txt").toString();
-
-        try (BufferedReader reader = new BufferedReader(new FileReader(archivo))) {
-            String linea = reader.readLine();
-
-            while ((linea = reader.readLine()) != null) {
-                if (linea.trim().isEmpty()) continue;
-
-                String[] partes = linea.split("\\|");
-                if (partes.length >= 6) {
-                    turnos.add(new Turno(
-                        partes[0],
-                        partes[1],
-                        partes[2],
-                        LocalDateTime.parse(partes[3], DATETIME_FORMAT),
-                        Boolean.parseBoolean(partes[5]),
-                        EstadoTurno.valueOf(partes[4])
-                    ));
-                }
+        try (Connection conn = conectar(); Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(
+            "SELECT ID, DNI_PACIENTE, MATRICULA_MEDICO, FECHA_HORA, SOBRETURNO, ESTADO FROM TURNO ORDER BY FECHA_HORA"
+        )) {
+            while (rs.next()) {
+                turnos.add(new Turno(
+                    rs.getString("ID"),
+                    rs.getString("DNI_PACIENTE"),
+                    rs.getString("MATRICULA_MEDICO"),
+                    rs.getTimestamp("FECHA_HORA").toLocalDateTime(),
+                    rs.getBoolean("SOBRETURNO"),
+                    EstadoTurno.valueOf(rs.getString("ESTADO"))
+                ));
             }
-        } catch (IOException e) {
-            System.out.println("No se pudo cargar turnos: " + e.getMessage());
+        } catch (SQLException e) {
+            System.out.println("Error al cargar turnos: " + e.getMessage());
         }
-
         return turnos;
     }
 
-
     public List<HistorialClinico> cargarHistoriales() {
         List<HistorialClinico> historiales = new ArrayList<>();
-        Map<String, HistorialClinico> mapaHistoriales = new HashMap<>();
-        String archivo = rutaBase.resolve("historiales_data.txt").toString();
+        Map<String, HistorialClinico> historialesPorDni = new HashMap<>();
 
-        try (BufferedReader reader = new BufferedReader(new FileReader(archivo))) {
-            String linea = reader.readLine();
-
-            while ((linea = reader.readLine()) != null) {
-                if (linea.trim().isEmpty()) continue;
-
-                String[] partes = linea.split("\\|");
-                if (partes.length >= 2) {
-                    String dniPaciente = partes[0];
-
-                    HistorialClinico historial = mapaHistoriales.computeIfAbsent(
-                        dniPaciente, k -> new HistorialClinico(k)
-                    );
-
-                    if (partes.length >= 5 && !partes[1].isEmpty()) {
-                        EntradaHistorial entrada = new EntradaHistorial(
-                            LocalDateTime.parse(partes[1], DATETIME_FORMAT),
-                            partes[2],
-                            partes[3],
-                            partes[4]
-                        );
-                        historial.agregarEntrada(entrada);
-                    }
-                }
+        try (Connection conn = conectar(); Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(
+            "SELECT DNI_PACIENTE FROM HISTORIAL_CLINICO ORDER BY DNI_PACIENTE"
+        )) {
+            while (rs.next()) {
+                HistorialClinico historial = new HistorialClinico(rs.getString("DNI_PACIENTE"));
+                historiales.add(historial);
+                historialesPorDni.put(historial.getDniPaciente(), historial);
             }
-        } catch (IOException e) {
-            System.out.println("No se pudo cargar historiales: " + e.getMessage());
+        } catch (SQLException e) {
+            System.out.println("Error al cargar historiales: " + e.getMessage());
+            return historiales;
         }
 
-        historiales.addAll(mapaHistoriales.values());
+        try (Connection conn = conectar(); Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(
+            "SELECT DNI_PACIENTE, FECHA, RESUMEN, DIAGNOSTICO, ESTUDIOS FROM ENTRADA_HISTORIAL ORDER BY DNI_PACIENTE, FECHA, ID"
+        )) {
+            while (rs.next()) {
+                String dniPaciente = rs.getString("DNI_PACIENTE");
+                HistorialClinico historial = historialesPorDni.get(dniPaciente);
+                if (historial == null) {
+                    historial = new HistorialClinico(dniPaciente);
+                    historiales.add(historial);
+                    historialesPorDni.put(dniPaciente, historial);
+                }
+                historial.agregarEntrada(new EntradaHistorial(
+                    rs.getTimestamp("FECHA").toLocalDateTime(),
+                    rs.getString("RESUMEN"),
+                    rs.getString("DIAGNOSTICO"),
+                    rs.getString("ESTUDIOS")
+                ));
+            }
+        } catch (SQLException e) {
+            System.out.println("Error al cargar entradas de historiales: " + e.getMessage());
+        }
         return historiales;
     }
 
-
     public List<Empleado> cargarEmpleados() {
         List<Empleado> empleados = new ArrayList<>();
-        String archivo = rutaBase.resolve("empleados_data.txt").toString();
-
-        try (BufferedReader reader = new BufferedReader(new FileReader(archivo))) {
-            String linea = reader.readLine();
-
-            while ((linea = reader.readLine()) != null) {
-                if (linea.trim().isEmpty()) continue;
-
-                String[] partes = linea.split("\\|");
-                if (partes.length >= 3) {
-                    empleados.add(new Empleado(
-                        partes[0],
-                        partes[1],
-                        RolUsuario.valueOf(partes[2])
-                    ));
-                }
+        try (Connection conn = conectar(); Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(
+            "SELECT LEGAJO, NOMBRE, ROL FROM EMPLEADO ORDER BY LEGAJO"
+        )) {
+            while (rs.next()) {
+                empleados.add(new Empleado(
+                    rs.getString("LEGAJO"),
+                    rs.getString("NOMBRE"),
+                    RolUsuario.valueOf(rs.getString("ROL"))
+                ));
             }
-        } catch (IOException e) {
-            System.out.println("No se pudo cargar empleados: " + e.getMessage());
+        } catch (SQLException e) {
+            System.out.println("Error al cargar empleados: " + e.getMessage());
         }
-
         return empleados;
     }
 
-
     public Map<String, List<String>> cargarNotificaciones() {
         Map<String, List<String>> notificaciones = new HashMap<>();
-        String archivo = rutaBase.resolve("notificaciones_data.txt").toString();
+        try (Connection conn = conectar(); Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(
+            "SELECT LEGAJO, MENSAJE FROM NOTIFICACION ORDER BY ID"
+        )) {
+            while (rs.next()) {
+                String legajo = rs.getString("LEGAJO");
+                String mensaje = rs.getString("MENSAJE");
+                notificaciones.computeIfAbsent(legajo, k -> new ArrayList<>()).add(mensaje);
+            }
+        } catch (SQLException e) {
+            System.out.println("Error al cargar notificaciones: " + e.getMessage());
+        }
+        return notificaciones;
+    }
 
-        try (BufferedReader reader = new BufferedReader(new FileReader(archivo))) {
-            String linea = reader.readLine();
+    private Connection conectar() throws SQLException {
+        return DriverManager.getConnection(urlConexion, "sa", "");
+    }
 
-            while ((linea = reader.readLine()) != null) {
-                if (linea.trim().isEmpty()) continue;
+    private void inicializarEsquema() {
+        try (Connection conn = conectar(); Statement st = conn.createStatement()) {
+            st.execute("CREATE TABLE IF NOT EXISTS PACIENTE ("
+                + "DNI VARCHAR(20) PRIMARY KEY, "
+                + "NOMBRE VARCHAR(100) NOT NULL, "
+                + "APELLIDO VARCHAR(100) NOT NULL, "
+                + "TELEFONO VARCHAR(30) NOT NULL, "
+                + "OBRA_SOCIAL VARCHAR(100) NOT NULL)");
 
-                String[] partes = linea.split("\\|", 2);
-                if (partes.length >= 2) {
-                    String matricula = partes[0];
-                    String mensaje = partes[1];
-                    notificaciones.computeIfAbsent(matricula, k -> new ArrayList<>()).add(mensaje);
+            st.execute("CREATE TABLE IF NOT EXISTS MEDICO ("
+                + "MATRICULA VARCHAR(20) PRIMARY KEY, "
+                + "NOMBRE VARCHAR(100) NOT NULL, "
+                + "APELLIDO VARCHAR(100) NOT NULL, "
+                + "ESPECIALIDAD VARCHAR(100) NOT NULL)");
+
+            st.execute("CREATE TABLE IF NOT EXISTS EMPLEADO ("
+                + "LEGAJO VARCHAR(20) PRIMARY KEY, "
+                + "NOMBRE VARCHAR(100) NOT NULL, "
+                + "ROL VARCHAR(30) NOT NULL)");
+
+            st.execute("CREATE TABLE IF NOT EXISTS DISPONIBILIDAD ("
+                + "ID IDENTITY PRIMARY KEY, "
+                + "MATRICULA VARCHAR(20) NOT NULL, "
+                + "DIA INT NOT NULL, "
+                + "HORA_INICIO TIME NOT NULL, "
+                + "HORA_FIN TIME NOT NULL, "
+                + "CONSTRAINT FK_DISPONIBILIDAD_MEDICO FOREIGN KEY (MATRICULA) REFERENCES MEDICO(MATRICULA) ON DELETE CASCADE)");
+
+            st.execute("CREATE TABLE IF NOT EXISTS TURNO ("
+                + "ID VARCHAR(40) PRIMARY KEY, "
+                + "DNI_PACIENTE VARCHAR(20) NOT NULL, "
+                + "MATRICULA_MEDICO VARCHAR(20) NOT NULL, "
+                + "FECHA_HORA TIMESTAMP NOT NULL, "
+                + "ESTADO VARCHAR(30) NOT NULL, "
+                + "SOBRETURNO BOOLEAN NOT NULL, "
+                + "CONSTRAINT FK_TURNO_PACIENTE FOREIGN KEY (DNI_PACIENTE) REFERENCES PACIENTE(DNI) ON DELETE CASCADE, "
+                + "CONSTRAINT FK_TURNO_MEDICO FOREIGN KEY (MATRICULA_MEDICO) REFERENCES MEDICO(MATRICULA) ON DELETE CASCADE)");
+
+            st.execute("CREATE TABLE IF NOT EXISTS HISTORIAL_CLINICO ("
+                + "DNI_PACIENTE VARCHAR(20) PRIMARY KEY, "
+                + "CONSTRAINT FK_HISTORIAL_PACIENTE FOREIGN KEY (DNI_PACIENTE) REFERENCES PACIENTE(DNI) ON DELETE CASCADE)");
+
+            st.execute("CREATE TABLE IF NOT EXISTS ENTRADA_HISTORIAL ("
+                + "ID IDENTITY PRIMARY KEY, "
+                + "DNI_PACIENTE VARCHAR(20) NOT NULL, "
+                + "FECHA TIMESTAMP NOT NULL, "
+                + "RESUMEN VARCHAR(4000) NOT NULL, "
+                + "DIAGNOSTICO VARCHAR(4000) NOT NULL, "
+                + "ESTUDIOS VARCHAR(4000) NOT NULL, "
+                + "CONSTRAINT FK_ENTRADA_HISTORIAL FOREIGN KEY (DNI_PACIENTE) REFERENCES HISTORIAL_CLINICO(DNI_PACIENTE) ON DELETE CASCADE)");
+
+            st.execute("CREATE TABLE IF NOT EXISTS NOTIFICACION ("
+                + "ID IDENTITY PRIMARY KEY, "
+                + "LEGAJO VARCHAR(20) NOT NULL, "
+                + "MENSAJE VARCHAR(1000) NOT NULL, "
+                + "CONSTRAINT FK_NOTIFICACION_EMPLEADO FOREIGN KEY (LEGAJO) REFERENCES EMPLEADO(LEGAJO) ON DELETE CASCADE)");
+        } catch (SQLException e) {
+            System.out.println("No se pudo inicializar la base de datos: " + e.getMessage());
+        }
+    }
+
+    @FunctionalInterface
+    private interface SqlConsumer {
+        void accept(Connection connection) throws SQLException;
+    }
+
+    private void ejecutarTransaccion(SqlConsumer accion, String mensajeError) {
+        Connection conn = null;
+        try {
+            conn = conectar();
+            conn.setAutoCommit(false);
+            accion.accept(conn);
+            conn.commit();
+        } catch (SQLException e) {
+            if (conn != null) {
+                try {
+                    conn.rollback();
+                } catch (SQLException ignored) {
+                    // Se ignora el rollback secundario para no tapar el error original.
                 }
             }
-        } catch (IOException e) {
-            System.out.println("No se pudo cargar notificaciones: " + e.getMessage());
+            System.out.println(mensajeError + e.getMessage());
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.close();
+                } catch (SQLException ignored) {
+                    // Sin accion.
+                }
+            }
         }
-
-        return notificaciones;
     }
 }

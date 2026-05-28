@@ -55,38 +55,7 @@ public class App {
     private static final DateTimeFormatter FORMATO_FECHA_HORA = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     public static void main(String[] args) {
-        inicializarSistema();
-
-        boolean continuar = true;
-        while (continuar) {
-            Optional<Empleado> empleadoOpt = login();
-            if (empleadoOpt.isEmpty()) {
-                continuar = false;
-                break;
-            }
-
-            Empleado empleado = empleadoOpt.get();
-            System.out.println("\nBienvenido/a " + empleado.getNombre() + " (" + empleado.getRol() + ").");
-
-            switch (empleado.getRol()) {
-                case RECEPCIONISTA:
-                    menuRecepcionista();
-                    break;
-                case MEDICO:
-                    menuMedico();
-                    break;
-                case ADMINISTRADOR:
-                    menuAdministrador();
-                    break;
-                default:
-                    System.out.println("Rol no reconocido.");
-                    break;
-            }
-        }
-
-        guardarBackup(CARPETA_BACKUP);
-        System.out.println("Saliendo del sistema...");
-        scanner.close();
+        com.healthhub.gui.VentanaLogin.main(args);
     }
 
     private static void inicializarSistema() {

@@ -32,6 +32,14 @@ public class GestorTurnos {
             return Optional.empty();
         }
 
+        if (!sobreturno && gestorMedicos != null && !gestorMedicos.estaDisponible(matriculaMedico, fechaHora)) {
+            return Optional.empty();
+        }
+
+        if (existeTurnoActivoEnHorario(matriculaMedico, fechaHora, null)) {
+            return Optional.empty();
+        }
+
         String idTurno = UUID.randomUUID().toString();
 
         Turno turno = new Turno(idTurno, dniPaciente, matriculaMedico, fechaHora, sobreturno);
@@ -77,12 +85,20 @@ public class GestorTurnos {
             return false;
         }
 
+        if (nuevaFechaHora.isBefore(LocalDateTime.now())) {
+            return false;
+        }
+
         Turno turno = turnoOpt.get();
 
         if (!turno.isSobreturno() && gestorMedicos != null) {
             if (!gestorMedicos.estaDisponible(turno.getMatriculaMedico(), nuevaFechaHora)) {
                 return false;
             }
+        }
+
+        if (existeTurnoActivoEnHorario(turno.getMatriculaMedico(), nuevaFechaHora, turno.getId())) {
+            return false;
         }
 
         turno.reprogramar(nuevaFechaHora);
@@ -231,5 +247,21 @@ public class GestorTurnos {
             }
         }
         return total;
+    }
+
+    private boolean existeTurnoActivoEnHorario(String matricula, LocalDateTime fechaHora, String turnoIdIgnorado) {
+        for (Turno turno : turnos) {
+            if (turnoIdIgnorado != null && turnoIdIgnorado.equals(turno.getId())) {
+                continue;
+            }
+
+            if (turno.getMatriculaMedico().equals(matricula)
+                && turno.getFechaHora().equals(fechaHora)
+                && turno.getEstado() != EstadoTurno.CANCELADO) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

@@ -55,7 +55,7 @@ El sistema tiene tres tipos de usuarios:
 ### 2.2 Supuestos
 - El sistema se usa solo en las computadoras de la clínica
 - Solo personal autorizado puede acceder
-- Los datos se guardan en una base de datos H2 embebida para esta entrega
+- Los datos se guardan en archivos de texto (.txt) para esta entrega
 - No hace falta login con contraseña (esto lo vimos con el profesor)
 
 ## 3. Requisitos funcionales
@@ -147,7 +147,7 @@ El sistema debe funcionar en las computadoras de la clínica (Windows, Linux o M
 - *Justificación:* No tienen equipos especializados
 
 **RNF2 - Persistencia**
-Los datos se guardan en una base de datos H2 embebida para esta entrega.
+Los datos se guardan en archivos de texto (.txt) para esta entrega.
 - *Limitación:* Es temporal, después se puede pasar a base de datos
 - *Ventaja:* No hace falta instalar nada extra
 
@@ -168,7 +168,7 @@ Toda la interfaz debe estar en español.
 ### 4.3 Limitaciones del proyecto
 
 **L1 - Sin base de datos real**
-Por ahora usamos una base H2 embebida porque es más fácil de ejecutar y ya persiste datos reales. Esto tiene sus ventajas y limitaciones:
+Por ahora usamos archivos .txt porque es más fácil para probar. Esto tiene sus problemas:
 - No hay transacciones (si se corta la luz a mitad del guardado, se puede perder data)
 - Es más lento si hay muchos registros
 - No hay backup automático
@@ -242,7 +242,7 @@ No hay login con usuario y contraseña. Cualquiera que abre la terminal puede us
 Este documento es la base para el desarrollo del sistema. Sabemos que hay cosas que se pueden mejorar, pero para la primera entrega nos enfocamos en cumplir con estos requisitos.
 
 **Cosas que nos gustaría agregar si da el tiempo:**
-- Backup automático de la base de datos
+- Backup automático de los archivos
 - Validación de formatos (DNI, teléfono, matrícula)
 - Que se pueda buscar pacientes solo con una parte del nombre
 
