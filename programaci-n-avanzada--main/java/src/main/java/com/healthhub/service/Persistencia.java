@@ -32,12 +32,36 @@ import java.util.Map;
 
 public class Persistencia {
 
-    private final Path rutaBase;
     private final String urlConexion;
+    private final String usuarioConexion;
+    private final String passwordConexion;
+
+    private static final String DB_HOST = System.getProperty(
+        "healthhub.db.host",
+        System.getenv().getOrDefault("HEALTHHUB_DB_HOST", "127.0.0.1")
+    );
+    private static final String DB_PORT = System.getProperty(
+        "healthhub.db.port",
+        System.getenv().getOrDefault("HEALTHHUB_DB_PORT", "3306")
+    );
+    private static final String DB_NAME = System.getProperty(
+        "healthhub.db.name",
+        System.getenv().getOrDefault("HEALTHHUB_DB_NAME", "healthhub")
+    );
+    private static final String DB_USER = System.getProperty(
+        "healthhub.db.user",
+        System.getenv().getOrDefault("HEALTHHUB_DB_USER", "root")
+    );
+    private static final String DB_PASSWORD = System.getProperty(
+        "healthhub.db.password",
+        System.getenv().getOrDefault("HEALTHHUB_DB_PASSWORD", "Nienpedo01")
+    );
 
     public Persistencia(Path rutaBase) {
-        this.rutaBase = rutaBase;
-        this.urlConexion = "jdbc:h2:file:" + rutaBase.resolve("healthhub-db").toString().replace('\\', '/') + ";MODE=MySQL";
+        this.urlConexion = "jdbc:mysql://" + DB_HOST + ":" + DB_PORT + "/" + DB_NAME
+            + "?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8";
+        this.usuarioConexion = DB_USER;
+        this.passwordConexion = DB_PASSWORD;
 
         try {
             Files.createDirectories(rutaBase);
@@ -105,8 +129,8 @@ public class Persistencia {
     }
 
     public String obtenerConsultaAgendaConsolidada() {
-        return "SELECT t.FECHA_HORA, p.NOMBRE || ' ' || p.APELLIDO AS PACIENTE, "
-            + "m.NOMBRE || ' ' || m.APELLIDO AS MEDICO, t.ESTADO, t.SOBRETURNO "
+        return "SELECT t.FECHA_HORA, CONCAT(p.NOMBRE, ' ', p.APELLIDO) AS PACIENTE, "
+            + "CONCAT(m.NOMBRE, ' ', m.APELLIDO) AS MEDICO, t.ESTADO, t.SOBRETURNO "
             + "FROM TURNO t "
             + "INNER JOIN PACIENTE p ON p.DNI = t.DNI_PACIENTE "
             + "INNER JOIN MEDICO m ON m.MATRICULA = t.MATRICULA_MEDICO "
@@ -460,7 +484,7 @@ public class Persistencia {
     }
 
     private Connection conectar() throws SQLException {
-        return DriverManager.getConnection(urlConexion, "sa", "");
+        return DriverManager.getConnection(urlConexion, usuarioConexion, passwordConexion);
     }
 
     private void inicializarEsquema() {
@@ -470,26 +494,26 @@ public class Persistencia {
                 + "NOMBRE VARCHAR(100) NOT NULL, "
                 + "APELLIDO VARCHAR(100) NOT NULL, "
                 + "TELEFONO VARCHAR(30) NOT NULL, "
-                + "OBRA_SOCIAL VARCHAR(100) NOT NULL)");
+                + "OBRA_SOCIAL VARCHAR(100) NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
             st.execute("CREATE TABLE IF NOT EXISTS MEDICO ("
                 + "MATRICULA VARCHAR(20) PRIMARY KEY, "
                 + "NOMBRE VARCHAR(100) NOT NULL, "
                 + "APELLIDO VARCHAR(100) NOT NULL, "
-                + "ESPECIALIDAD VARCHAR(100) NOT NULL)");
+                + "ESPECIALIDAD VARCHAR(100) NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
             st.execute("CREATE TABLE IF NOT EXISTS EMPLEADO ("
                 + "LEGAJO VARCHAR(20) PRIMARY KEY, "
                 + "NOMBRE VARCHAR(100) NOT NULL, "
-                + "ROL VARCHAR(30) NOT NULL)");
+                + "ROL VARCHAR(30) NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
             st.execute("CREATE TABLE IF NOT EXISTS DISPONIBILIDAD ("
-                + "ID IDENTITY PRIMARY KEY, "
+                + "ID BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY, "
                 + "MATRICULA VARCHAR(20) NOT NULL, "
                 + "DIA INT NOT NULL, "
                 + "HORA_INICIO TIME NOT NULL, "
                 + "HORA_FIN TIME NOT NULL, "
-                + "CONSTRAINT FK_DISPONIBILIDAD_MEDICO FOREIGN KEY (MATRICULA) REFERENCES MEDICO(MATRICULA) ON DELETE CASCADE)");
+                + "CONSTRAINT FK_DISPONIBILIDAD_MEDICO FOREIGN KEY (MATRICULA) REFERENCES MEDICO(MATRICULA) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
             st.execute("CREATE TABLE IF NOT EXISTS TURNO ("
                 + "ID VARCHAR(40) PRIMARY KEY, "
@@ -499,26 +523,26 @@ public class Persistencia {
                 + "ESTADO VARCHAR(30) NOT NULL, "
                 + "SOBRETURNO BOOLEAN NOT NULL, "
                 + "CONSTRAINT FK_TURNO_PACIENTE FOREIGN KEY (DNI_PACIENTE) REFERENCES PACIENTE(DNI) ON DELETE CASCADE, "
-                + "CONSTRAINT FK_TURNO_MEDICO FOREIGN KEY (MATRICULA_MEDICO) REFERENCES MEDICO(MATRICULA) ON DELETE CASCADE)");
+                + "CONSTRAINT FK_TURNO_MEDICO FOREIGN KEY (MATRICULA_MEDICO) REFERENCES MEDICO(MATRICULA) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
             st.execute("CREATE TABLE IF NOT EXISTS HISTORIAL_CLINICO ("
                 + "DNI_PACIENTE VARCHAR(20) PRIMARY KEY, "
-                + "CONSTRAINT FK_HISTORIAL_PACIENTE FOREIGN KEY (DNI_PACIENTE) REFERENCES PACIENTE(DNI) ON DELETE CASCADE)");
+                + "CONSTRAINT FK_HISTORIAL_PACIENTE FOREIGN KEY (DNI_PACIENTE) REFERENCES PACIENTE(DNI) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
             st.execute("CREATE TABLE IF NOT EXISTS ENTRADA_HISTORIAL ("
-                + "ID IDENTITY PRIMARY KEY, "
+                + "ID BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY, "
                 + "DNI_PACIENTE VARCHAR(20) NOT NULL, "
                 + "FECHA TIMESTAMP NOT NULL, "
                 + "RESUMEN VARCHAR(4000) NOT NULL, "
                 + "DIAGNOSTICO VARCHAR(4000) NOT NULL, "
                 + "ESTUDIOS VARCHAR(4000) NOT NULL, "
-                + "CONSTRAINT FK_ENTRADA_HISTORIAL FOREIGN KEY (DNI_PACIENTE) REFERENCES HISTORIAL_CLINICO(DNI_PACIENTE) ON DELETE CASCADE)");
+                + "CONSTRAINT FK_ENTRADA_HISTORIAL FOREIGN KEY (DNI_PACIENTE) REFERENCES HISTORIAL_CLINICO(DNI_PACIENTE) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
             st.execute("CREATE TABLE IF NOT EXISTS NOTIFICACION ("
-                + "ID IDENTITY PRIMARY KEY, "
+                + "ID BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY, "
                 + "LEGAJO VARCHAR(20) NOT NULL, "
                 + "MENSAJE VARCHAR(1000) NOT NULL, "
-                + "CONSTRAINT FK_NOTIFICACION_EMPLEADO FOREIGN KEY (LEGAJO) REFERENCES EMPLEADO(LEGAJO) ON DELETE CASCADE)");
+                + "CONSTRAINT FK_NOTIFICACION_EMPLEADO FOREIGN KEY (LEGAJO) REFERENCES EMPLEADO(LEGAJO) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         } catch (SQLException e) {
             System.out.println("No se pudo inicializar la base de datos: " + e.getMessage());
         }

@@ -1,6 +1,5 @@
 package com.healthhub.service;
 
-import com.healthhub.domain.HistorialClinico;
 import com.healthhub.domain.Paciente;
 
 import java.text.Normalizer;

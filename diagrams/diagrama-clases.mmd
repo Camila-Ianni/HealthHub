@@ -85,7 +85,7 @@ classDiagram
       +cargarNotificaciones()
     }
 
-    %% Persistencia JDBC/H2
+    %% Persistencia SQL mediante JDBC (H2 en modo MySQL)
 
     class Empleado {
       -String legajo
@@ -120,6 +120,8 @@ classDiagram
     class HistorialClinico {
       -String dniPaciente
       -List~EntradaHistorial~ entradas
+      +agregarEntrada(EntradaHistorial)
+      +getEntradas()
     }
 
     class EntradaHistorial {

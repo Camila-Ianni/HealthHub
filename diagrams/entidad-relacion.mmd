@@ -1,5 +1,5 @@
 erDiagram
-    %% Base de datos H2 embebida
+    %% Esquema SQL de HealthHub (compatible con MySQL; runtime actual en H2 modo MySQL)
     EMPLEADO {
         string legajo PK
         string nombre
@@ -22,10 +22,11 @@ erDiagram
     }
 
     DISPONIBILIDAD {
+        bigint id PK
         string matricula FK
-        string dia
-        string horaInicio
-        string horaFin
+        int dia
+        time hora_inicio
+        time hora_fin
     }
 
     TURNO {
@@ -42,7 +43,7 @@ erDiagram
     }
 
     ENTRADA_HISTORIAL {
-        string id PK
+        bigint id PK
         string dniPaciente FK
         datetime fecha
         string resumen
@@ -51,6 +52,7 @@ erDiagram
     }
 
     NOTIFICACION {
+        bigint id PK
         string legajo FK
         string mensaje
     }

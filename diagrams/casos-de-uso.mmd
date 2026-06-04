@@ -11,7 +11,7 @@ flowchart LR
         T((Gestion de turnos))
         H((Gestion de historiales))
         N((Notificaciones))
-        G((Base de datos H2))
+        G((Persistencia SQL))
     end
 
     R --> L
@@ -43,3 +43,5 @@ flowchart LR
     T --> G
     H --> G
     N --> G
+
+    G --- DB[(H2 modo MySQL / esquema MySQL importable)]
