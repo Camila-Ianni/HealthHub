@@ -95,3 +95,42 @@ CREATE TABLE NOTIFICACION (
     FOREIGN KEY (LEGAJO) REFERENCES EMPLEADO(LEGAJO)
     ON DELETE CASCADE
 ) ENGINE=InnoDB;
+
+INSERT INTO EMPLEADO (LEGAJO, NOMBRE, ROL) VALUES
+  ('1000', 'Lucia Romero', 'ADMINISTRADOR'),
+  ('2000', 'Valeria Gomez', 'RECEPCIONISTA'),
+  ('3000', 'Martin Paredes', 'MEDICO');
+
+INSERT INTO MEDICO (MATRICULA, NOMBRE, APELLIDO, ESPECIALIDAD) VALUES
+  ('MP-101', 'Martin', 'Paredes', 'Clinica general'),
+  ('MP-202', 'Sofia', 'Suarez', 'Pediatria');
+
+INSERT INTO PACIENTE (DNI, NOMBRE, APELLIDO, TELEFONO, OBRA_SOCIAL) VALUES
+  ('40111222', 'Ana', 'Lopez', '1160001000', 'OSDE'),
+  ('40999888', 'Bruno', 'Diaz', '1160002000', 'Swiss Medical');
+
+INSERT INTO DISPONIBILIDAD (MATRICULA, DIA, HORA_INICIO, HORA_FIN) VALUES
+  ('MP-101', 1, '08:00:00', '14:00:00'),
+  ('MP-101', 3, '09:00:00', '15:00:00'),
+  ('MP-202', 2, '10:00:00', '16:00:00'),
+  ('MP-202', 4, '09:00:00', '13:00:00');
+
+INSERT INTO HISTORIAL_CLINICO (DNI_PACIENTE) VALUES
+  ('40111222'),
+  ('40999888');
+
+INSERT INTO ENTRADA_HISTORIAL (DNI_PACIENTE, FECHA, RESUMEN, DIAGNOSTICO, ESTUDIOS) VALUES
+  ('40111222', '2026-06-01 09:00:00', 'Consulta inicial', 'Paciente estable', 'Sin estudios pendientes'),
+  ('40111222', '2026-06-03 10:30:00', 'Control general', 'Evolucion favorable', 'Analisis de rutina'),
+  ('40999888', '2026-06-02 11:00:00', 'Control pediatrico', 'Sin hallazgos relevantes', 'Vacunacion al dia'),
+  ('40999888', '2026-06-04 12:15:00', 'Seguimiento', 'Buen estado general', 'Sin estudios requeridos');
+
+INSERT INTO TURNO (ID, DNI_PACIENTE, MATRICULA_MEDICO, FECHA_HORA, ESTADO, SOBRETURNO) VALUES
+  ('T-001', '40111222', 'MP-101', '2026-06-08 09:00:00', 'PROGRAMADO', FALSE),
+  ('T-002', '40999888', 'MP-202', '2026-06-10 10:00:00', 'PROGRAMADO', FALSE);
+
+INSERT INTO NOTIFICACION (LEGAJO, MENSAJE) VALUES
+  ('3000', 'Bienvenida: ya podés gestionar la agenda desde el panel.'),
+  ('3000', 'Tenés 2 turnos programados esta semana.'),
+  ('2000', 'Bienvenida: revisá la agenda y los pacientes cargados.'),
+  ('1000', 'Acceso de administrador habilitado para HealthHub.');
